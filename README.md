@@ -40,7 +40,7 @@ PixelLite Pro is a pure frontend image processing application built with React a
 
 ### One-Click Deploy
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fyourusername%2Fpixellite-pro)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/XCQ0607/PixelLite)
 
 ### Environment Variables
 
@@ -77,7 +77,7 @@ This application requires a Google Gemini API Key for AI features.
 
 ```bash
 # 1. Clone the repo
-git clone https://github.com/yourusername/pixellite-pro.git
+git clone https://github.com/XCQ0607/PixelLite.git
 
 # 2. Install dependencies
 npm install

@@ -38,7 +38,7 @@ PixelLite Pro 是一个基于 React 和 Vite 构建的纯前端图片处理应�
 
 ### 一键部署 (Vercel)
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fyourusername%2Fpixellite-pro)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/XCQ0607/PixelLite)
 
 ### 环境变量
 
@@ -75,7 +75,7 @@ PixelLite Pro 是一个基于 React 和 Vite 构建的纯前端图片处理应�
 
 ```bash
 # 1. 克隆仓库
-git clone https://github.com/yourusername/pixellite-pro.git
+git clone https://github.com/XCQ0607/PixelLite.git
 
 # 2. 安装依赖
 npm install

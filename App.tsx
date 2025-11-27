@@ -621,7 +621,7 @@ function App() {
   }
 
   // Helper to check if AI Enhancement is active and not generated yet
-  const isPendingAiEnhance = currentImage && currentImage.mode === 'enhance' && settings.enhanceMethod === 'ai' && currentImage.qualityUsed === 0;
+  const isPendingAiEnhance = !!currentImage && currentImage.mode === 'enhance' && settings.enhanceMethod === 'ai' && currentImage.qualityUsed === 0;
 
   return (
     <div 

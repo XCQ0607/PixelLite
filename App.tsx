@@ -11,6 +11,7 @@ import { RestoreModal } from './components/RestoreModal';
 import { compressImage, applyImageEnhancement, formatBytes, blobToDataURL, getCompressedFileName } from './services/imageService';
 import { analyzeImage, generateEnhancedImage } from './services/geminiService';
 import { ProcessedImage, AppSettings, ProcessMode } from './types';
+import { StorageService } from './services/storageService';
 
 // Translation Dictionary
 const translations = {
@@ -294,6 +295,25 @@ function App() {
         webdav: { url: '', username: '', password: '' }
     });
 
+    // Load Settings & History on Mount
+    useEffect(() => {
+        const savedSettings = StorageService.loadSettings();
+        if (savedSettings) {
+            setSettings(prev => ({ ...prev, ...savedSettings }));
+        }
+
+        StorageService.loadAllImages().then(savedHistory => {
+            if (savedHistory.length > 0) {
+                setHistory(savedHistory);
+            }
+        }).catch(console.error);
+    }, []);
+
+    // Save Settings on Change
+    useEffect(() => {
+        StorageService.saveSettings(settings);
+    }, [settings]);
+
     const fileInputRef = useRef<HTMLInputElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
 
@@ -520,6 +540,7 @@ function App() {
         if (currentImage && !hasSaved) {
             setHistory(prev => [currentImage, ...prev]);
             setHasSaved(true);
+            StorageService.saveImage(currentImage).catch(console.error);
         }
     };
 
@@ -601,6 +622,7 @@ function App() {
                 onBack={() => setShowDataManager(false)}
                 onDelete={(ids) => {
                     setHistory(prev => prev.filter(p => !ids.includes(p.id)));
+                    StorageService.deleteAllImages(ids).catch(console.error);
                     if (currentImage && ids.includes(currentImage.id)) {
                         setCurrentImage(null);
                         setHasSaved(false);

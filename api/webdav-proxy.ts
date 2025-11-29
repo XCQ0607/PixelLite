@@ -37,7 +37,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         // Prepare headers
         const requestHeaders: HeadersInit = {
             'Authorization': authHeader,
-            'User-Agent': 'PixelLite-Pro/1.0 (Vercel Serverless)',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             ...headers
         };
 
@@ -75,10 +75,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
 
         // Return response
+        // We return the status code from the WebDAV server, but we also include debug info
         return res.status(webdavResponse.status).json({
             ok: webdavResponse.ok,
             status: webdavResponse.status,
             statusText: webdavResponse.statusText,
+            headers: Object.fromEntries(webdavResponse.headers.entries()), // Return headers for debugging (e.g. WWW-Authenticate)
             response: responseData
         });
 

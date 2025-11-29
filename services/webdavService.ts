@@ -68,7 +68,13 @@ const callProxy = async (
 
     if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || `Proxy request failed with status ${response.status}`);
+
+        if (errorData.response && errorData.response.data) {
+            console.error("WebDAV Error Details:", errorData.response.data);
+            console.error("WebDAV Response Headers:", errorData.headers);
+        }
+
+        throw new Error(errorData.message || `Proxy request failed with status ${response.status}: ${errorData.statusText || ''}`);
     }
 
     return await response.json();
@@ -84,9 +90,18 @@ const getPixelLiteUrl = (baseUrl: string) => {
 const ensureDirectoryExists = async (config: WebDAVConfig) => {
     const targetUrl = getPixelLiteUrl(config.url);
 
-    // Check if exists
-    const checkResult = await callProxy(targetUrl, 'PROPFIND', config, { depth: '0' });
-    if (checkResult.ok || checkResult.status === 207) return true;
+    try {
+        // Check if exists
+        const checkResult = await callProxy(targetUrl, 'PROPFIND', config, { depth: '0' });
+        if (checkResult.ok || checkResult.status === 207) return true;
+    } catch (e: any) {
+        // If 404, it means folder doesn't exist, so we proceed to create it
+        // We need to check if the error message or status indicates 404
+        // Since we updated callProxy to throw with status, we can check the message or just proceed if it looks like a fetch error
+        if (!e.message.includes('404')) {
+            throw e; // Re-throw if it's not 404 (e.g. 401 Auth error)
+        }
+    }
 
     // If not, try to create it (MKCOL)
     const createResult = await callProxy(targetUrl, 'MKCOL', config);
@@ -113,8 +128,6 @@ export const listBackups = async (config: WebDAVConfig): Promise<{ name: string,
         const result = await callProxy(targetUrl, 'PROPFIND', config, { depth: '1' });
 
         if (!result.ok && result.status !== 207) {
-            // If folder doesn't exist, return empty list instead of error
-            if (result.status === 404) return [];
             throw new Error(`PROPFIND failed with status ${result.status}`);
         }
 
@@ -136,7 +149,11 @@ export const listBackups = async (config: WebDAVConfig): Promise<{ name: string,
         });
 
         return files.sort((a, b) => b.name.localeCompare(a.name));
-    } catch (e) {
+    } catch (e: any) {
+        // If folder doesn't exist (404), return empty list
+        if (e.message.includes('404')) {
+            return [];
+        }
         console.error("List Backups Failed", e);
         throw e;
     }

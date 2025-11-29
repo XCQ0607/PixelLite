@@ -19,7 +19,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     try {
         const options: any = { apiKey: key };
         if (baseUrl) {
-            options.baseUrl = baseUrl;
+            options.httpOptions = { baseUrl: baseUrl };
         }
         const ai = new GoogleGenAI(options);
 

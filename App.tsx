@@ -685,6 +685,21 @@ function App() {
                 t={t}
                 onRestoreClick={() => setShowRestoreModal(true)}
                 historyForBackup={history}
+                onLocalRestore={(res) => {
+                    // Same logic as RestoreModal
+                    const newImages = res.images;
+                    const newSettings = res.settings;
+
+                    setHistory(prev => {
+                        const existingIds = new Set(prev.map(i => i.id));
+                        const itemsToAdd = newImages.filter(i => !existingIds.has(i.id));
+                        return [...itemsToAdd, ...prev];
+                    });
+
+                    if (newSettings && confirm("Found settings in backup. Restore them?")) {
+                        setSettings(newSettings);
+                    }
+                }}
             />
 
             <RestoreModal

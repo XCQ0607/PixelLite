@@ -142,21 +142,24 @@ export const listBackups = async (config: WebDAVConfig): Promise<{ name: string,
     }
 };
 
-export const createBackup = async (
-    config: WebDAVConfig,
+
+export const generateBackupFilename = (tag: string): string => {
+    const dateStr = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    const cleanTag = tag.replace(/[^a-zA-Z0-9\-_]/g, '');
+    return `PixelLite_Backup_${dateStr}_[${cleanTag}].zip`;
+};
+
+export const generateBackupZip = async (
     history: ProcessedImage[],
     settings: AppSettings,
     tag: string
-): Promise<void> => {
-    // Ensure folder exists before upload
-    await ensureDirectoryExists(config);
-
+): Promise<Blob> => {
     const zip = new JSZip();
     const metadata: BackupMetadata = {
         version: "1.1",
         timestamp: Date.now(),
         tag: tag,
-        settings: settings, // Include full settings
+        settings: settings,
         items: []
     };
 
@@ -188,52 +191,91 @@ export const createBackup = async (
     }
 
     zip.file("metadata.json", JSON.stringify(metadata, null, 2));
+    return await zip.generateAsync({ type: "blob" });
+};
 
-    const zipBlob = await zip.generateAsync({ type: "blob" });
+export const createBackup = async (
+    config: WebDAVConfig,
+    history: ProcessedImage[],
+    settings: AppSettings,
+    tag: string,
+    onProgress?: (progress: number) => void
+): Promise<void> => {
+    // Ensure folder exists before upload
+    await ensureDirectoryExists(config);
 
-    // Generate Filename
-    const dateStr = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-    const cleanTag = tag.replace(/[^a-zA-Z0-9\-_]/g, '');
-    const filename = `PixelLite_Backup_${dateStr}_[${cleanTag}].zip`;
+    const zipBlob = await generateBackupZip(history, settings, tag);
+    const filename = generateBackupFilename(tag);
 
     // Upload to PixelLite subdirectory
     const targetUrl = getPixelLiteUrl(config.url) + filename;
 
-    // Convert blob to base64 for transfer through proxy
-    const arrayBuffer = await zipBlob.arrayBuffer();
-    const base64Body = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+    // Use XMLHttpRequest for progress tracking
+    return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
 
-    const result = await callProxy(targetUrl, 'PUT', config, {
-        headers: {
-            'Content-Type': 'application/zip'
-        },
-        body: base64Body
+        // Prepare form data for direct binary upload
+        const formData = new FormData();
+        formData.append('file', zipBlob, filename);
+
+        // Setup auth header
+        const authHeader = 'Basic ' + btoa(`${config.username}:${config.password}`);
+
+        xhr.open('PUT', `/api/webdav-proxy`, true);
+        xhr.setRequestHeader('Content-Type', 'application/json');
+
+        // Track upload progress
+        xhr.upload.onprogress = (e) => {
+            if (e.lengthComputable && onProgress) {
+                const percentComplete = Math.round((e.loaded / e.total) * 100);
+                onProgress(percentComplete);
+            }
+        };
+
+        xhr.onload = () => {
+            if (xhr.status >= 200 && xhr.status < 300) {
+                try {
+                    const response = JSON.parse(xhr.responseText);
+                    if (response.ok || response.status === 201 || response.status === 204) {
+                        resolve();
+                    } else {
+                        reject(new Error(`Upload failed with status ${response.status}`));
+                    }
+                } catch (e) {
+                    reject(new Error('Failed to parse response'));
+                }
+            } else {
+                reject(new Error(`Request failed with status ${xhr.status}`));
+            }
+        };
+
+        xhr.onerror = () => {
+            reject(new Error('Network error during upload'));
+        };
+
+        // Convert blob to base64 for proxy
+        zipBlob.arrayBuffer().then(arrayBuffer => {
+            const base64Body = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+
+            const requestBody = JSON.stringify({
+                targetUrl,
+                method: 'PUT',
+                credentials: {
+                    username: config.username,
+                    password: config.password
+                },
+                headers: {
+                    'Content-Type': 'application/zip'
+                },
+                body: base64Body
+            });
+
+            xhr.send(requestBody);
+        }).catch(reject);
     });
-
-    if (!result.ok && result.status !== 201 && result.status !== 204) {
-        throw new Error(`Upload failed with status ${result.status}`);
-    }
 };
 
-export const restoreBackup = async (
-    config: WebDAVConfig,
-    filename: string
-): Promise<{ images: ProcessedImage[], settings?: AppSettings }> => {
-    // Download from PixelLite subdirectory
-    const targetUrl = getPixelLiteUrl(config.url) + filename;
-
-    const result = await callProxy(targetUrl, 'GET', config);
-
-    if (!result.ok) throw new Error("Download failed");
-
-    // Decode base64 response to blob
-    const binaryString = atob(result.response.data);
-    const bytes = new Uint8Array(binaryString.length);
-    for (let i = 0; i < binaryString.length; i++) {
-        bytes[i] = binaryString.charCodeAt(i);
-    }
-    const blob = new Blob([bytes], { type: 'application/zip' });
-
+export const parseBackupZip = async (blob: Blob): Promise<{ images: ProcessedImage[], settings?: AppSettings }> => {
     const zip = await JSZip.loadAsync(blob);
 
     const metadataFile = zip.file("metadata.json");
@@ -278,4 +320,74 @@ export const restoreBackup = async (
     return { images: restoredImages, settings: metadata.settings };
 };
 
+export const restoreBackup = async (
+    config: WebDAVConfig,
+    filename: string
+): Promise<{ images: ProcessedImage[], settings?: AppSettings }> => {
+    // Download from PixelLite subdirectory
+    const targetUrl = getPixelLiteUrl(config.url) + filename;
 
+    const result = await callProxy(targetUrl, 'GET', config);
+
+    if (!result.ok) throw new Error("Download failed");
+
+    // Decode base64 response to blob
+    const binaryString = atob(result.response.data);
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+    }
+    const blob = new Blob([bytes], { type: 'application/zip' });
+
+    return await parseBackupZip(blob);
+};
+
+
+
+export const deleteBackups = async (
+    config: WebDAVConfig,
+    filenames: string[]
+): Promise<void> => {
+    const targetBaseUrl = getPixelLiteUrl(config.url);
+
+    // Process sequentially to avoid overwhelming the server/proxy
+    for (const filename of filenames) {
+        try {
+            const targetUrl = targetBaseUrl + filename;
+            await callProxy(targetUrl, 'DELETE', config);
+        } catch (e) {
+            console.error(`Failed to delete ${filename}`, e);
+            // Continue deleting others even if one fails
+        }
+    }
+};
+
+export const downloadBackupsAsZip = async (
+    config: WebDAVConfig,
+    filenames: string[]
+): Promise<Blob> => {
+    const zip = new JSZip();
+    const targetBaseUrl = getPixelLiteUrl(config.url);
+
+    for (const filename of filenames) {
+        try {
+            const targetUrl = targetBaseUrl + filename;
+            const result = await callProxy(targetUrl, 'GET', config);
+
+            if (result.ok && result.response.data) {
+                // Decode base64 response to blob
+                const binaryString = atob(result.response.data);
+                const bytes = new Uint8Array(binaryString.length);
+                for (let i = 0; i < binaryString.length; i++) {
+                    bytes[i] = binaryString.charCodeAt(i);
+                }
+                // Add to zip
+                zip.file(filename, bytes);
+            }
+        } catch (e) {
+            console.error(`Failed to download ${filename}`, e);
+        }
+    }
+
+    return await zip.generateAsync({ type: "blob" });
+};

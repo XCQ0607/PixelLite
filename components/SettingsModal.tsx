@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { X, Save, Wand2, Globe, Cloud, UploadCloud, DownloadCloud, Loader2, Layers, Link, Zap, Cpu, Sparkles, MessageSquare, Microscope, Tag } from 'lucide-react';
-import { AppSettings } from '../types';
-import { checkWebDAVConnection, createBackup } from '../services/webdavService';
+import { X, Save, Wand2, Globe, Cloud, UploadCloud, DownloadCloud, Loader2, Layers, Link, Zap, Cpu, Sparkles, MessageSquare, Microscope, Tag, Download, Upload } from 'lucide-react';
+import { AppSettings, ProcessedImage } from '../types';
+import { checkWebDAVConnection, createBackup, generateBackupZip, generateBackupFilename, parseBackupZip } from '../services/webdavService';
 
 interface SettingsModalProps {
     isOpen: boolean;
@@ -11,16 +11,18 @@ interface SettingsModalProps {
     t: (key: string) => string;
     onRestoreClick: () => void;
     historyForBackup: any[];
+    onLocalRestore?: (data: { images: ProcessedImage[], settings?: AppSettings }) => void;
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
-    isOpen, onClose, settings, onSave, t, onRestoreClick, historyForBackup
+    isOpen, onClose, settings, onSave, t, onRestoreClick, historyForBackup, onLocalRestore
 }) => {
     const [localSettings, setLocalSettings] = useState<AppSettings>(settings);
     const [activeTab, setActiveTab] = useState<'general' | 'modes' | 'webdav'>('general');
     const [isChecking, setIsChecking] = useState(false);
     const [connectionStatus, setConnectionStatus] = useState<'none' | 'success' | 'failed'>('none');
     const [isBackingUp, setIsBackingUp] = useState(false);
+    const [uploadProgress, setUploadProgress] = useState(0);
     const [backupTag, setBackupTag] = useState('PixelLite');
     const [toast, setToast] = useState<{ message: string, type: 'success' | 'error' | 'info' } | null>(null);
 
@@ -77,14 +79,22 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         }
 
         setIsBackingUp(true);
+        setUploadProgress(0);
         try {
-            await createBackup(localSettings.webdav, historyForBackup, localSettings, backupTag);
+            await createBackup(
+                localSettings.webdav,
+                historyForBackup,
+                localSettings,
+                backupTag,
+                (progress) => setUploadProgress(progress)
+            );
             showToast(t('backup_success'), 'success');
         } catch (e: any) {
             console.error(e);
             showToast("Backup Error: " + e.message, 'error');
         } finally {
             setIsBackingUp(false);
+            setUploadProgress(0);
         }
     };
 
@@ -417,6 +427,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                                         onClick={handleBackup}
                                         disabled={isBackingUp || !localSettings.webdav?.url}
                                         className="flex items-center justify-center gap-2 py-3 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400 text-white rounded-lg transition-colors"
+                                        title={!localSettings.webdav?.url ? "Configure WebDAV first" : ""}
                                     >
                                         {isBackingUp ? <Loader2 className="animate-spin" size={18} /> : <UploadCloud size={18} />}
                                         {t('backup_btn')}
@@ -425,10 +436,91 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                                         onClick={() => { onClose(); onRestoreClick(); }}
                                         disabled={!localSettings.webdav?.url}
                                         className="flex items-center justify-center gap-2 py-3 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-400 text-white rounded-lg transition-colors"
+                                        title={!localSettings.webdav?.url ? "Configure WebDAV first" : ""}
                                     >
                                         <DownloadCloud size={18} />
-                                        {t('restore_btn')}
+                                        Manage / Restore
                                     </button>
+                                </div>
+
+                                {/* Upload Progress Bar */}
+                                {isBackingUp && uploadProgress > 0 && (
+                                    <div className="space-y-2 bg-gray-50 dark:bg-gray-800/50 p-3 rounded-lg">
+                                        <div className="flex justify-between items-center text-xs">
+                                            <span className="text-gray-600 dark:text-gray-400">Uploading to WebDAV...</span>
+                                            <span className="font-mono font-bold text-indigo-600 dark:text-indigo-400">{uploadProgress}%</span>
+                                        </div>
+                                        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
+                                            <div
+                                                className="h-full bg-gradient-to-r from-indigo-500 to-indigo-600 transition-all duration-300 ease-out"
+                                                style={{ width: `${uploadProgress}%` }}
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div className="relative flex py-2 items-center">
+                                    <div className="flex-grow border-t border-gray-300 dark:border-gray-600"></div>
+                                    <span className="flex-shrink-0 mx-4 text-gray-400 text-xs">OR LOCAL</span>
+                                    <div className="flex-grow border-t border-gray-300 dark:border-gray-600"></div>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-4">
+                                    <button
+                                        onClick={async () => {
+                                            try {
+                                                const zipBlob = await generateBackupZip(historyForBackup, localSettings, backupTag || 'LocalBackup');
+                                                const filename = generateBackupFilename(backupTag || 'LocalBackup');
+                                                const url = URL.createObjectURL(zipBlob);
+                                                const a = document.createElement('a');
+                                                a.href = url;
+                                                a.download = filename;
+                                                document.body.appendChild(a);
+                                                a.click();
+                                                document.body.removeChild(a);
+                                                URL.revokeObjectURL(url);
+                                                showToast("Backup downloaded successfully", 'success');
+                                            } catch (e: any) {
+                                                showToast("Local backup failed: " + e.message, 'error');
+                                            }
+                                        }}
+                                        className="flex items-center justify-center gap-2 py-3 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-800 dark:text-white rounded-lg transition-colors"
+                                    >
+                                        <Download size={18} />
+                                        Save to Disk
+                                    </button>
+                                    <button
+                                        onClick={() => document.getElementById('local-restore-input')?.click()}
+                                        className="flex items-center justify-center gap-2 py-3 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-800 dark:text-white rounded-lg transition-colors"
+                                    >
+                                        <Upload size={18} />
+                                        Load from Disk
+                                    </button>
+                                    <input
+                                        type="file"
+                                        id="local-restore-input"
+                                        className="hidden"
+                                        accept=".zip"
+                                        onChange={async (e) => {
+                                            const file = e.target.files?.[0];
+                                            if (!file) return;
+                                            if (!confirm(`Restore from ${file.name}? Current history will be merged.`)) return;
+
+                                            try {
+                                                const result = await parseBackupZip(file);
+                                                if (onLocalRestore) {
+                                                    onLocalRestore(result);
+                                                    showToast(`Restored ${result.images.length} items successfully`, 'success');
+                                                    onClose();
+                                                } else {
+                                                    showToast("Restore handler not connected", 'error');
+                                                }
+                                            } catch (err: any) {
+                                                showToast("Invalid backup file: " + err.message, 'error');
+                                            }
+                                            e.target.value = ''; // Reset
+                                        }}
+                                    />
                                 </div>
                             </div>
                         </div>
@@ -448,6 +540,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     </button>
                 </div>
             </div>
-        </div>
+        </div >
     );
 };

@@ -51,5 +51,4 @@ export interface AppSettings {
   aiPrompt: string;
   language: Language;
   webdav: WebDAVConfig;
-  theme: 'light' | 'dark' | 'system';
 }

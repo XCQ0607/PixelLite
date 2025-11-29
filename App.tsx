@@ -651,12 +651,24 @@ function App() {
             } as React.CSSProperties}
         >
             <div className="fixed top-0 left-0 w-full h-full overflow-hidden -z-10 bg-gray-50 dark:bg-dark">
+                {/* Mouse Follower Blob */}
                 <div
-                    className="absolute w-[600px] h-[600px] rounded-full bg-gradient-to-r from-primary/10 to-secondary/10 blur-[100px] pointer-events-none transition-transform duration-75 ease-out translate-x-[-50%] translate-y-[-50%]"
+                    className="absolute w-[600px] h-[600px] rounded-full bg-gradient-to-r from-primary/20 to-secondary/20 blur-[100px] pointer-events-none transition-transform duration-75 ease-out translate-x-[-50%] translate-y-[-50%]"
                     style={{ left: 'var(--mouse-x)', top: 'var(--mouse-y)' }}
                 ></div>
+
+                {/* Ambient Blobs */}
                 <div className="absolute top-0 left-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-[120px] animate-blob"></div>
                 <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-[120px] animate-blob animation-delay-2000"></div>
+
+                {/* Grid Pattern with Spotlight Reveal */}
+                <div
+                    className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px] pointer-events-none"
+                    style={{
+                        maskImage: 'radial-gradient(circle at var(--mouse-x) var(--mouse-y), black, transparent 400px)',
+                        WebkitMaskImage: 'radial-gradient(circle at var(--mouse-x) var(--mouse-y), black, transparent 400px)'
+                    }}
+                ></div>
             </div>
 
             <SettingsModal

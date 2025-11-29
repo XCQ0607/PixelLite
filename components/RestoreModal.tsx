@@ -120,32 +120,33 @@ export const RestoreModal: React.FC<RestoreModalProps> = ({ isOpen, onClose, con
                 </div>
 
                 {/* Toolbar */}
-                <div className="p-3 border-b dark:border-gray-700 flex justify-between items-center bg-white dark:bg-card">
-                    <div className="flex items-center gap-2">
+                <div className="p-3 border-b dark:border-gray-700 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-white dark:bg-card">
+                    <div className="flex items-center gap-2 w-full sm:w-auto">
                         <button
                             onClick={toggleAll}
-                            className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+                            className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 py-1.5 text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
                         >
                             {selectedBackups.size > 0 && selectedBackups.size === backups.length ? <CheckSquare size={16} className="text-primary" /> : <Square size={16} />}
                             Select All
                         </button>
-                        <span className="text-xs text-gray-400">
+                        <span className="text-xs text-gray-400 whitespace-nowrap">
                             {selectedBackups.size} selected
                         </span>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 w-full sm:w-auto">
                         <button
                             onClick={handleBatchDownload}
                             disabled={selectedBackups.size === 0 || isProcessing}
-                            className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:text-blue-400 dark:hover:bg-blue-900/40 rounded-lg transition-colors disabled:opacity-50"
+                            className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-1.5 text-sm font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:text-blue-400 dark:hover:bg-blue-900/40 rounded-lg transition-colors disabled:opacity-50"
                         >
                             {isProcessing ? <Loader2 size={16} className="animate-spin" /> : <Archive size={16} />}
-                            Download ZIP
+                            <span className="hidden sm:inline">Download ZIP</span>
+                            <span className="sm:hidden">ZIP</span>
                         </button>
                         <button
                             onClick={handleBatchDelete}
                             disabled={selectedBackups.size === 0 || isProcessing}
-                            className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-red-600 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:text-red-400 dark:hover:bg-red-900/40 rounded-lg transition-colors disabled:opacity-50"
+                            className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-1.5 text-sm font-medium text-red-600 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:text-red-400 dark:hover:bg-red-900/40 rounded-lg transition-colors disabled:opacity-50"
                         >
                             {isProcessing ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
                             Delete
@@ -175,19 +176,23 @@ export const RestoreModal: React.FC<RestoreModalProps> = ({ isOpen, onClose, con
                                         onClick={() => toggleSelection(file.name)}
                                     >
                                         <div className="flex items-center gap-3 overflow-hidden flex-1">
-                                            <div onClick={(e) => { e.stopPropagation(); toggleSelection(file.name); }} className="cursor-pointer text-gray-400 hover:text-primary">
+                                            <div onClick={(e) => { e.stopPropagation(); toggleSelection(file.name); }} className="cursor-pointer text-gray-400 hover:text-primary flex-shrink-0">
                                                 {isSelected ? <CheckSquare size={20} className="text-primary" /> : <Square size={20} />}
                                             </div>
-                                            <div className="bg-blue-100 dark:bg-blue-900/30 p-2 rounded text-blue-600">
+                                            <div className="bg-blue-100 dark:bg-blue-900/30 p-2 rounded text-blue-600 flex-shrink-0 hidden sm:block">
                                                 <FileArchive size={20} />
                                             </div>
-                                            <div className="min-w-0 flex-1">
-                                                <p className="font-medium truncate text-sm" title={file.name}>{file.name}</p>
-                                                <div className="flex items-center gap-2 mt-0.5">
-                                                    <p className="text-xs text-gray-400">{new Date(file.lastModified).toLocaleDateString()} {new Date(file.lastModified).toLocaleTimeString()}</p>
+                                            <div className="min-w-0 flex-1 mr-2">
+                                                <p className="font-medium text-sm break-all" title={file.name}>
+                                                    {file.name}
+                                                </p>
+                                                <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-0.5">
+                                                    <p className="text-xs text-gray-400 whitespace-nowrap">
+                                                        {new Date(file.lastModified).toLocaleDateString()}
+                                                    </p>
                                                     {tag && (
-                                                        <span className="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-500 text-[10px] rounded flex items-center gap-0.5">
-                                                            <Tag size={8} /> {tag}
+                                                        <span className="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-500 text-[10px] rounded flex items-center gap-0.5 max-w-full truncate">
+                                                            <Tag size={8} className="flex-shrink-0" /> {tag}
                                                         </span>
                                                     )}
                                                 </div>
@@ -196,11 +201,11 @@ export const RestoreModal: React.FC<RestoreModalProps> = ({ isOpen, onClose, con
                                         <button
                                             disabled={isRestoring || isProcessing}
                                             onClick={(e) => { e.stopPropagation(); handleRestore(file.name); }}
-                                            className="ml-2 px-3 py-1.5 text-xs font-medium bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 rounded-lg transition-colors flex items-center gap-1"
+                                            className="flex-shrink-0 px-3 py-1.5 text-xs font-medium bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 rounded-lg transition-colors flex items-center gap-1"
                                             title="Restore this backup"
                                         >
                                             {isRestoring ? <Loader2 className="animate-spin" size={14} /> : <Download size={14} />}
-                                            Restore
+                                            <span className="hidden sm:inline">Restore</span>
                                         </button>
                                     </div>
                                 )

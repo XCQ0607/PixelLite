@@ -22,7 +22,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     const [isChecking, setIsChecking] = useState(false);
     const [connectionStatus, setConnectionStatus] = useState<'none' | 'success' | 'failed'>('none');
     const [isBackingUp, setIsBackingUp] = useState(false);
-    const [uploadProgress, setUploadProgress] = useState(0);
     const [backupTag, setBackupTag] = useState('PixelLite');
     const [toast, setToast] = useState<{ message: string, type: 'success' | 'error' | 'info' } | null>(null);
 
@@ -79,22 +78,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         }
 
         setIsBackingUp(true);
-        setUploadProgress(0);
         try {
-            await createBackup(
-                localSettings.webdav,
-                historyForBackup,
-                localSettings,
-                backupTag,
-                (progress) => setUploadProgress(progress)
-            );
+            await createBackup(localSettings.webdav, historyForBackup, localSettings, backupTag);
             showToast(t('backup_success'), 'success');
         } catch (e: any) {
             console.error(e);
             showToast("Backup Error: " + e.message, 'error');
         } finally {
             setIsBackingUp(false);
-            setUploadProgress(0);
         }
     };
 
@@ -442,22 +433,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                                         Manage / Restore
                                     </button>
                                 </div>
-
-                                {/* Upload Progress Bar */}
-                                {isBackingUp && uploadProgress > 0 && (
-                                    <div className="space-y-2 bg-gray-50 dark:bg-gray-800/50 p-3 rounded-lg">
-                                        <div className="flex justify-between items-center text-xs">
-                                            <span className="text-gray-600 dark:text-gray-400">Uploading to WebDAV...</span>
-                                            <span className="font-mono font-bold text-indigo-600 dark:text-indigo-400">{uploadProgress}%</span>
-                                        </div>
-                                        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
-                                            <div
-                                                className="h-full bg-gradient-to-r from-indigo-500 to-indigo-600 transition-all duration-300 ease-out"
-                                                style={{ width: `${uploadProgress}%` }}
-                                            />
-                                        </div>
-                                    </div>
-                                )}
 
                                 <div className="relative flex py-2 items-center">
                                     <div className="flex-grow border-t border-gray-300 dark:border-gray-600"></div>

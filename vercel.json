@@ -10,10 +10,6 @@
     },
     "rewrites": [
         {
-            "source": "/api/webdav-proxy",
-            "destination": "/api/webdav-proxy.ts"
-        },
-        {
             "source": "/((?!api).*)",
             "destination": "/index.html"
         }

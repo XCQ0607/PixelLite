@@ -198,8 +198,7 @@ export const createBackup = async (
     config: WebDAVConfig,
     history: ProcessedImage[],
     settings: AppSettings,
-    tag: string,
-    onProgress?: (progress: number) => void
+    tag: string
 ): Promise<void> => {
     // Ensure folder exists before upload
     await ensureDirectoryExists(config);
@@ -210,70 +209,20 @@ export const createBackup = async (
     // Upload to PixelLite subdirectory
     const targetUrl = getPixelLiteUrl(config.url) + filename;
 
-    // Use XMLHttpRequest for progress tracking
-    return new Promise((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
+    // Convert blob to base64 for transfer through proxy
+    const arrayBuffer = await zipBlob.arrayBuffer();
+    const base64Body = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
 
-        // Prepare form data for direct binary upload
-        const formData = new FormData();
-        formData.append('file', zipBlob, filename);
-
-        // Setup auth header
-        const authHeader = 'Basic ' + btoa(`${config.username}:${config.password}`);
-
-        // The PROXY itself is always called via POST
-        xhr.open('POST', `/api/webdav-proxy`, true);
-        xhr.setRequestHeader('Content-Type', 'application/json');
-
-        // Track upload progress
-        xhr.upload.onprogress = (e) => {
-            if (e.lengthComputable && onProgress) {
-                const percentComplete = Math.round((e.loaded / e.total) * 100);
-                onProgress(percentComplete);
-            }
-        };
-
-        xhr.onload = () => {
-            if (xhr.status >= 200 && xhr.status < 300) {
-                try {
-                    const response = JSON.parse(xhr.responseText);
-                    if (response.ok || response.status === 201 || response.status === 204) {
-                        resolve();
-                    } else {
-                        reject(new Error(`Upload failed with status ${response.status}`));
-                    }
-                } catch (e) {
-                    reject(new Error('Failed to parse response'));
-                }
-            } else {
-                reject(new Error(`Request failed with status ${xhr.status}`));
-            }
-        };
-
-        xhr.onerror = () => {
-            reject(new Error('Network error during upload'));
-        };
-
-        // Convert blob to base64 for proxy
-        zipBlob.arrayBuffer().then(arrayBuffer => {
-            const base64Body = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
-
-            const requestBody = JSON.stringify({
-                targetUrl,
-                method: 'PUT',
-                credentials: {
-                    username: config.username,
-                    password: config.password
-                },
-                headers: {
-                    'Content-Type': 'application/zip'
-                },
-                body: base64Body
-            });
-
-            xhr.send(requestBody);
-        }).catch(reject);
+    const result = await callProxy(targetUrl, 'PUT', config, {
+        headers: {
+            'Content-Type': 'application/zip'
+        },
+        body: base64Body
     });
+
+    if (!result.ok && result.status !== 201 && result.status !== 204) {
+        throw new Error(`Upload failed with status ${result.status}`);
+    }
 };
 
 export const parseBackupZip = async (blob: Blob): Promise<{ images: ProcessedImage[], settings?: AppSettings }> => {

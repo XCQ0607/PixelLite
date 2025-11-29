@@ -221,7 +221,8 @@ export const createBackup = async (
         // Setup auth header
         const authHeader = 'Basic ' + btoa(`${config.username}:${config.password}`);
 
-        xhr.open('PUT', `/api/webdav-proxy`, true);
+        // The PROXY itself is always called via POST
+        xhr.open('POST', `/api/webdav-proxy`, true);
         xhr.setRequestHeader('Content-Type', 'application/json');
 
         // Track upload progress

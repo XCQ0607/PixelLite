@@ -45,10 +45,11 @@ export interface AppSettings {
   smartCompression: boolean;
   compressionMode: 'balanced' | 'strict';
   defaultProcessMode: ProcessMode;
-  enhanceMethod: EnhanceMethod; 
+  enhanceMethod: EnhanceMethod;
   analysisModel: string; // New: custom model for analysis
   aiModel: string; // New: custom model name for generation
-  aiPrompt: string; 
+  aiPrompt: string;
   language: Language;
   webdav: WebDAVConfig;
+  theme: 'light' | 'dark' | 'system';
 }

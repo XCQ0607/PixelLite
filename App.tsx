@@ -292,7 +292,8 @@ function App() {
         analysisModel: 'gemini-2.5-flash',
         aiPrompt: 'Enhance the clarity and details of this image, maintain realistic colors.',
         language: 'zh',
-        webdav: { url: '', username: '', password: '' }
+        webdav: { url: '', username: '', password: '' },
+        theme: 'system'
     });
 
     // Load Settings & History on Mount
@@ -323,6 +324,28 @@ function App() {
     }, [settings.language]);
 
     // Theme Handling
+    // Theme Handling
+    useEffect(() => {
+        const applyTheme = () => {
+            if (settings.theme === 'system') {
+                const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                setIsDark(systemDark);
+            } else {
+                setIsDark(settings.theme === 'dark');
+            }
+        };
+
+        applyTheme();
+
+        const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+        const handleChange = () => {
+            if (settings.theme === 'system') applyTheme();
+        };
+
+        mediaQuery.addEventListener('change', handleChange);
+        return () => mediaQuery.removeEventListener('change', handleChange);
+    }, [settings.theme]);
+
     useEffect(() => {
         if (isDark) {
             document.documentElement.classList.add('dark');
@@ -670,48 +693,6 @@ function App() {
                     }}
                 ></div>
             </div>
-
-            <SettingsModal
-                isOpen={showSettings}
-                onClose={() => setShowSettings(false)}
-                settings={settings}
-                onSave={(newSettings) => {
-                    setSettings(newSettings);
-                    // If method changed, trigger re-process if image exists
-                    if (currentImage && currentImage.mode === 'enhance' && newSettings.enhanceMethod !== settings.enhanceMethod) {
-                        // Logic to handle switch if needed, currently simplified
-                    }
-                }}
-                t={t}
-                onRestoreClick={() => setShowRestoreModal(true)}
-                historyForBackup={history}
-            />
-
-            <RestoreModal
-                isOpen={showRestoreModal}
-                onClose={() => setShowRestoreModal(false)}
-                config={settings.webdav}
-                onRestore={(res) => {
-                    // Restore Settings if present
-                    // The service now returns { images, settings }
-                    const restoredData = res as unknown as { images: ProcessedImage[], settings?: AppSettings };
-
-                    // Handle legacy return type (array) vs new type
-                    const newImages = Array.isArray(restoredData) ? restoredData : restoredData.images;
-                    const newSettings = !Array.isArray(restoredData) ? restoredData.settings : undefined;
-
-                    setHistory(prev => {
-                        const existingIds = new Set(prev.map(i => i.id));
-                        const itemsToAdd = newImages.filter(i => !existingIds.has(i.id));
-                        return [...itemsToAdd, ...prev];
-                    });
-
-                    if (newSettings && confirm("Found settings in backup. Restore them?")) {
-                        setSettings(newSettings);
-                    }
-                }}
-            />
-
             {/* Header */}
             <header className="fixed top-0 w-full z-50 glass-panel border-b-0 border-white/10 px-6 py-4">
                 <div className="max-w-7xl mx-auto flex justify-between items-center">

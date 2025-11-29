@@ -1,13 +1,12 @@
-
+import { AppSettings, ProcessedImage, WebDAVConfig, AIData, ProcessMode } from '../types';
 import JSZip from 'jszip';
-import { ProcessedImage, WebDAVConfig, AIData, ProcessMode, AppSettings } from '../types';
 import { blobToDataURL } from './imageService';
 
 interface BackupMetadata {
     version: string;
     timestamp: number;
     tag: string;
-    settings?: AppSettings; // Full settings backup
+    settings?: AppSettings;
     items: {
         id: string;
         originalName: string;
@@ -18,7 +17,7 @@ interface BackupMetadata {
         timestamp: number;
         aiData?: AIData;
         mode?: ProcessMode;
-        enhanceMethod?: any; // Keep generic for backup compat
+        enhanceMethod?: any;
         originalFileNameRef: string;
         compressedFileNameRef: string;
     }[];
@@ -27,51 +26,64 @@ interface BackupMetadata {
 interface ProxyResponse {
     ok: boolean;
     status: number;
-    statusText: string;
-    response: {
-        type: 'text' | 'binary';
-        data: string;
-        contentType?: string;
-    };
+    statusText?: string;
+    text?: string;
+    type?: 'text' | 'binary';
+    data?: string;
+    contentType?: string;
+    headers?: Record<string, string>;
 }
 
-// Helper function to call the proxy
-const callProxy = async (
-    targetUrl: string,
-    method: string,
-    config: WebDAVConfig,
-    options?: {
-        headers?: Record<string, string>;
-        body?: string;
-        depth?: string;
-    }
-): Promise<ProxyResponse> => {
-    const proxyUrl = '/api/webdav-proxy';
+// Cache for listBackups
+let backupListCache: { timestamp: number, data: { name: string, lastModified: string }[] } | null = null;
+const CACHE_DURATION = 60 * 1000; // 1 minute
 
-    const response = await fetch(proxyUrl, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-            targetUrl,
-            method,
-            credentials: {
-                username: config.username,
-                password: config.password
+const getPixelLiteUrl = (baseUrl: string) => {
+    return baseUrl.endsWith('/') ? `${baseUrl}PixelLite/` : `${baseUrl}/PixelLite/`;
+};
+
+const callProxy = async (targetUrl: string, method: string, config: WebDAVConfig, options: { headers?: any, body?: any, depth?: string } = {}): Promise<ProxyResponse> => {
+    try {
+        const response = await fetch('/api/webdav-proxy', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
             },
-            headers: options?.headers,
-            body: options?.body,
-            depth: options?.depth
-        })
-    });
+            body: JSON.stringify({
+                targetUrl,
+                method,
+                credentials: {
+                    username: config.username,
+                    password: config.password
+                },
+                headers: options.headers,
+                body: options.body,
+                depth: options.depth
+            })
+        });
 
-    if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || `Proxy request failed with status ${response.status}`);
+        if (!response.ok) {
+            throw new Error(`Proxy error: ${response.statusText}`);
+        }
+
+        return await response.json();
+    } catch (error) {
+        console.error("Proxy Call Failed", error);
+        throw error;
     }
+};
 
-    return await response.json();
+const ensureDirectoryExists = async (config: WebDAVConfig) => {
+    const pixelLiteUrl = getPixelLiteUrl(config.url);
+    const checkResult = await callProxy(pixelLiteUrl, 'PROPFIND', config, { depth: '0' });
+
+    if (!checkResult.ok && checkResult.status === 404) {
+        console.log("Creating PixelLite directory...");
+        const createResult = await callProxy(pixelLiteUrl, 'MKCOL', config);
+        if (!createResult.ok && createResult.status !== 201 && createResult.status !== 405) {
+            throw new Error(`Failed to create directory: ${createResult.status}`);
+        }
+    }
 };
 
 export const checkWebDAVConnection = async (config: WebDAVConfig): Promise<boolean> => {
@@ -84,50 +96,62 @@ export const checkWebDAVConnection = async (config: WebDAVConfig): Promise<boole
     }
 };
 
-export const listBackups = async (config: WebDAVConfig): Promise<{ name: string, lastModified: string }[]> => {
-    try {
-        const result = await callProxy(config.url, 'PROPFIND', config, { depth: '1' });
-
-        if (!result.ok && result.status !== 207) {
-            throw new Error(`PROPFIND failed with status ${result.status}`);
-        }
-
-        const text = result.response.data;
-        const parser = new DOMParser();
-        const xml = parser.parseFromString(text, "text/xml");
-        const responses = xml.querySelectorAll('response');
-
-        const files: { name: string, lastModified: string }[] = [];
-
-        responses.forEach(resp => {
-            const href = resp.querySelector('href')?.textContent || '';
-            const name = href.split('/').filter(Boolean).pop() || '';
-            // Basic filter for our backup files
-            if (name.startsWith('PixelLite_Backup_') && name.endsWith('.zip')) {
-                const lastMod = resp.querySelector('getlastmodified')?.textContent || '';
-                files.push({ name, lastModified: lastMod });
-            }
-        });
-
-        return files.sort((a, b) => b.name.localeCompare(a.name));
-    } catch (e) {
-        console.error("List Backups Failed", e);
-        throw e;
+export const listBackups = async (config: WebDAVConfig, forceRefresh = false): Promise<{ name: string, lastModified: string }[]> => {
+    if (!forceRefresh && backupListCache && (Date.now() - backupListCache.timestamp < CACHE_DURATION)) {
+        console.log("Returning cached backup list");
+        return backupListCache.data;
     }
+
+    await ensureDirectoryExists(config);
+    const pixelLiteUrl = getPixelLiteUrl(config.url);
+
+    const result = await callProxy(pixelLiteUrl, 'PROPFIND', config, { depth: '1' });
+
+    if (!result.ok && result.status !== 207) {
+        if (result.status === 404) return [];
+        throw new Error(`Failed to list backups: ${result.status}`);
+    }
+
+    const xmlText = result.text || (result as any).response?.data || '';
+    const parser = new DOMParser();
+    const xmlDoc = parser.parseFromString(xmlText, "text/xml");
+    const responses = xmlDoc.querySelectorAll("response");
+
+    const backups: { name: string, lastModified: string }[] = [];
+
+    responses.forEach(response => {
+        const href = response.querySelector("href")?.textContent || "";
+        const name = href.split('/').filter(Boolean).pop() || '';
+
+        if (name.startsWith('PixelLite_Backup_') && name.endsWith('.zip')) {
+            const lastMod = response.querySelector("getlastmodified")?.textContent || "";
+            backups.push({ name, lastModified: lastMod });
+        }
+    });
+
+    backups.sort((a, b) => b.name.localeCompare(a.name));
+
+    backupListCache = { timestamp: Date.now(), data: backups };
+
+    return backups;
 };
 
 export const createBackup = async (
     config: WebDAVConfig,
     history: ProcessedImage[],
     settings: AppSettings,
-    tag: string
+    tag: string,
+    onProgress?: (progress: number) => void
 ): Promise<void> => {
+    await ensureDirectoryExists(config);
+    const pixelLiteUrl = getPixelLiteUrl(config.url);
+
     const zip = new JSZip();
     const metadata: BackupMetadata = {
         version: "1.1",
         timestamp: Date.now(),
         tag: tag,
-        settings: settings, // Include full settings
+        settings: settings,
         items: []
     };
 
@@ -162,42 +186,67 @@ export const createBackup = async (
 
     const zipBlob = await zip.generateAsync({ type: "blob" });
 
-    // Generate Filename
     const dateStr = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
     const cleanTag = tag.replace(/[^a-zA-Z0-9\-_]/g, '');
     const filename = `PixelLite_Backup_${dateStr}_[${cleanTag}].zip`;
+    const targetUrl = pixelLiteUrl + filename;
 
-    // Upload via proxy
-    const uploadUrl = config.url.endsWith('/') ? config.url + filename : config.url + '/' + filename;
+    return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', '/api/webdav-proxy');
 
-    // Convert blob to base64 for transfer through proxy
-    const arrayBuffer = await zipBlob.arrayBuffer();
-    const base64Body = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+        xhr.setRequestHeader('x-webdav-target-url', targetUrl);
+        xhr.setRequestHeader('x-webdav-method', 'PUT');
+        xhr.setRequestHeader('Content-Type', 'application/zip');
 
-    const result = await callProxy(uploadUrl, 'PUT', config, {
-        headers: {
-            'Content-Type': 'application/zip'
-        },
-        body: base64Body
+        const authHeader = 'Basic ' + btoa(`${config.username}:${config.password}`);
+        xhr.setRequestHeader('Authorization', authHeader);
+
+        if (onProgress) {
+            xhr.upload.onprogress = (event) => {
+                if (event.lengthComputable) {
+                    const percentComplete = (event.loaded / event.total) * 100;
+                    onProgress(percentComplete);
+                }
+            };
+        }
+
+        xhr.onload = () => {
+            if (xhr.status === 200) {
+                backupListCache = null;
+                resolve();
+            } else {
+                try {
+                    const errorResp = JSON.parse(xhr.responseText);
+                    reject(new Error(errorResp.details || errorResp.error || 'Upload failed'));
+                } catch (e) {
+                    reject(new Error(`Upload failed with status ${xhr.status}`));
+                }
+            }
+        };
+
+        xhr.onerror = () => {
+            reject(new Error('Network error during upload'));
+        };
+
+        xhr.send(zipBlob);
     });
-
-    if (!result.ok && result.status !== 201 && result.status !== 204) {
-        throw new Error(`Upload failed with status ${result.status}`);
-    }
 };
 
 export const restoreBackup = async (
     config: WebDAVConfig,
     filename: string
 ): Promise<{ images: ProcessedImage[], settings?: AppSettings }> => {
-    const fileUrl = config.url.endsWith('/') ? config.url + filename : config.url + '/' + filename;
+    const targetUrl = getPixelLiteUrl(config.url) + filename;
 
-    const result = await callProxy(fileUrl, 'GET', config);
+    const result = await callProxy(targetUrl, 'GET', config);
 
     if (!result.ok) throw new Error("Download failed");
 
-    // Decode base64 response to blob
-    const binaryString = atob(result.response.data);
+    const base64Data = result.data || (result as any).response?.data;
+    if (!base64Data) throw new Error("No data received");
+
+    const binaryString = atob(base64Data);
     const bytes = new Uint8Array(binaryString.length);
     for (let i = 0; i < binaryString.length; i++) {
         bytes[i] = binaryString.charCodeAt(i);
@@ -222,7 +271,6 @@ export const restoreBackup = async (
             const originalBlob = await origFileInZip.async("blob");
             const compressedBlob = await compFileInZip.async("blob");
 
-            // Reconstruct File object
             const originalFile = new File([originalBlob], item.originalName, { type: originalBlob.type });
             const originalPreview = await blobToDataURL(originalBlob);
             const compressedPreview = await blobToDataURL(compressedBlob);
@@ -246,4 +294,43 @@ export const restoreBackup = async (
     }
 
     return { images: restoredImages, settings: metadata.settings };
+};
+
+export const deleteBackups = async (config: WebDAVConfig, filenames: string[]): Promise<void> => {
+    const pixelLiteUrl = getPixelLiteUrl(config.url);
+
+    const deletePromises = filenames.map(filename => {
+        const targetUrl = pixelLiteUrl + filename;
+        return callProxy(targetUrl, 'DELETE', config);
+    });
+
+    const results = await Promise.all(deletePromises);
+
+    const failed = results.filter(r => !r.ok && r.status !== 404);
+
+    if (failed.length > 0) {
+        throw new Error(`Failed to delete ${failed.length} backups`);
+    }
+
+    backupListCache = null;
+};
+
+export const downloadBackups = async (config: WebDAVConfig, filenames: string[]): Promise<void> => {
+    for (const filename of filenames) {
+        const pixelLiteUrl = getPixelLiteUrl(config.url);
+        const targetUrl = pixelLiteUrl + filename;
+
+        const result = await callProxy(targetUrl, 'GET', config);
+
+        const base64Data = result.data || (result as any).response?.data;
+
+        if (result.ok && base64Data) {
+            const link = document.createElement('a');
+            link.href = `data:application/zip;base64,${base64Data}`;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+    }
 };

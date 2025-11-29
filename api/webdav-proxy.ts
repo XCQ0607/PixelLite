@@ -37,6 +37,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         // Prepare headers
         const requestHeaders: HeadersInit = {
             'Authorization': authHeader,
+            'User-Agent': 'PixelLite-Pro/1.0 (Vercel Serverless)',
             ...headers
         };
 

@@ -23,6 +23,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     const [connectionStatus, setConnectionStatus] = useState<'none' | 'success' | 'failed'>('none');
     const [isBackingUp, setIsBackingUp] = useState(false);
     const [backupTag, setBackupTag] = useState('PixelLite');
+    const [uploadProgress, setUploadProgress] = useState(0);
     const [toast, setToast] = useState<{ message: string, type: 'success' | 'error' | 'info' } | null>(null);
 
     // Auto-dismiss toast
@@ -73,17 +74,22 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             return;
         }
         if (!backupTag.trim()) {
-            showToast("Please enter a backup tag", 'error');
+            showToast(t('enter_backup_tag'), 'error');
             return;
         }
 
         setIsBackingUp(true);
+        setUploadProgress(0);
         try {
-            await createBackup(localSettings.webdav, historyForBackup, localSettings, backupTag);
+            await createBackup(localSettings.webdav, historyForBackup, localSettings, backupTag, (progress) => {
+                setUploadProgress(progress);
+            });
             showToast(t('backup_success'), 'success');
+            setBackupTag('');
+            setUploadProgress(0);
         } catch (e: any) {
             console.error(e);
-            showToast("Backup Error: " + e.message, 'error');
+            showToast(t('backup_error_prefix') + e.message, 'error');
         } finally {
             setIsBackingUp(false);
         }
@@ -403,7 +409,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                                 {/* Backup Tag Input */}
                                 <div className="space-y-2">
                                     <label className="text-sm font-medium flex items-center gap-2">
-                                        <Tag size={14} /> Backup Tag / Name
+                                        <Tag size={14} /> {t('backup_tag_label')}
                                     </label>
                                     <input
                                         className="w-full p-2 rounded border dark:bg-dark dark:border-gray-600"
@@ -412,6 +418,21 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                                         onChange={e => setBackupTag(e.target.value)}
                                     />
                                 </div>
+
+                                {isBackingUp && (
+                                    <div className="space-y-1 animate-fade-in">
+                                        <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400">
+                                            <span>{t('uploading')}</span>
+                                            <span>{Math.round(uploadProgress)}%</span>
+                                        </div>
+                                        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
+                                            <div
+                                                className="bg-indigo-600 h-full transition-all duration-300 ease-out"
+                                                style={{ width: `${uploadProgress}%` }}
+                                            />
+                                        </div>
+                                    </div>
+                                )}
 
                                 <div className="grid grid-cols-2 gap-4">
                                     <button
@@ -430,13 +451,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                                         title={!localSettings.webdav?.url ? "Configure WebDAV first" : ""}
                                     >
                                         <DownloadCloud size={18} />
-                                        Manage / Restore
+                                        {t('manage_restore_btn')}
                                     </button>
                                 </div>
 
                                 <div className="relative flex py-2 items-center">
                                     <div className="flex-grow border-t border-gray-300 dark:border-gray-600"></div>
-                                    <span className="flex-shrink-0 mx-4 text-gray-400 text-xs">OR LOCAL</span>
+                                    <span className="flex-shrink-0 mx-4 text-gray-400 text-xs">{t('or_local')}</span>
                                     <div className="flex-grow border-t border-gray-300 dark:border-gray-600"></div>
                                 </div>
 
@@ -454,22 +475,22 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                                                 a.click();
                                                 document.body.removeChild(a);
                                                 URL.revokeObjectURL(url);
-                                                showToast("Backup downloaded successfully", 'success');
+                                                showToast(t('backup_downloaded'), 'success');
                                             } catch (e: any) {
-                                                showToast("Local backup failed: " + e.message, 'error');
+                                                showToast(t('local_backup_failed') + e.message, 'error');
                                             }
                                         }}
                                         className="flex items-center justify-center gap-2 py-3 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-800 dark:text-white rounded-lg transition-colors"
                                     >
                                         <Download size={18} />
-                                        Save to Disk
+                                        {t('save_to_disk')}
                                     </button>
                                     <button
                                         onClick={() => document.getElementById('local-restore-input')?.click()}
                                         className="flex items-center justify-center gap-2 py-3 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-800 dark:text-white rounded-lg transition-colors"
                                     >
                                         <Upload size={18} />
-                                        Load from Disk
+                                        {t('load_from_disk')}
                                     </button>
                                     <input
                                         type="file"
@@ -479,19 +500,19 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                                         onChange={async (e) => {
                                             const file = e.target.files?.[0];
                                             if (!file) return;
-                                            if (!confirm(`Restore from ${file.name}? Current history will be merged.`)) return;
+                                            if (!confirm(t('confirm_restore_local').replace('{filename}', file.name))) return;
 
                                             try {
                                                 const result = await parseBackupZip(file);
                                                 if (onLocalRestore) {
                                                     onLocalRestore(result);
-                                                    showToast(`Restored ${result.images.length} items successfully`, 'success');
+                                                    showToast(t('restore_success_count').replace('{count}', result.images.length.toString()), 'success');
                                                     onClose();
                                                 } else {
-                                                    showToast("Restore handler not connected", 'error');
+                                                    showToast(t('restore_handler_missing'), 'error');
                                                 }
                                             } catch (err: any) {
-                                                showToast("Invalid backup file: " + err.message, 'error');
+                                                showToast(t('invalid_backup_file') + err.message, 'error');
                                             }
                                             e.target.value = ''; // Reset
                                         }}

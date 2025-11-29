@@ -13,13 +13,55 @@ interface ProxyRequestBody {
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-    // Only allow POST requests
+    // Only allow POST requests (or PUT for streaming if we wanted, but we keep POST for consistency)
     if (req.method !== 'POST') {
         return res.status(405).json({ error: 'Method not allowed' });
     }
 
     try {
-        const { targetUrl, method, credentials, headers = {}, body, depth } = req.body as ProxyRequestBody;
+        let targetUrl: string;
+        let method: string;
+        let credentials: { username: string; password: string };
+        let headers: Record<string, string> = {};
+        let body: any;
+        let depth: string | undefined;
+
+        // Check if this is a binary upload (streaming)
+        const contentType = req.headers['content-type'] || '';
+        if (contentType.includes('application/octet-stream') || contentType.includes('application/zip')) {
+            // Extract metadata from headers
+            targetUrl = req.headers['x-webdav-target'] as string;
+            method = req.headers['x-webdav-method'] as string;
+            const credsHeader = req.headers['x-webdav-credentials'] as string;
+
+            if (credsHeader) {
+                try {
+                    credentials = JSON.parse(Buffer.from(credsHeader, 'base64').toString());
+                } catch (e) {
+                    return res.status(400).json({ error: 'Invalid credentials header' });
+                }
+            } else {
+                return res.status(400).json({ error: 'Missing credentials header' });
+            }
+
+            // Body is the request stream itself
+            // Note: In Vercel Serverless, req is an IncomingMessage, which is a readable stream.
+            // We can pass it directly to fetch body if supported, or read it.
+            // Node-fetch supports stream as body.
+            body = req;
+
+            // We might need to set the content-type for the WebDAV request
+            headers['Content-Type'] = contentType;
+        } else {
+            // Standard JSON request (existing logic)
+            const jsonBody = req.body as ProxyRequestBody;
+            targetUrl = jsonBody.targetUrl;
+            method = jsonBody.method;
+            credentials = jsonBody.credentials;
+            headers = jsonBody.headers || {};
+            body = jsonBody.body;
+            depth = jsonBody.depth;
+        }
 
         // Validate request
         if (!targetUrl || !method || !credentials?.username || !credentials?.password) {
@@ -35,7 +77,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const authHeader = 'Basic ' + Buffer.from(`${credentials.username}:${credentials.password}`).toString('base64');
 
         // Prepare headers
-        const requestHeaders: HeadersInit = {
+        const requestHeaders: any = {
             'Authorization': authHeader,
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             ...headers
@@ -50,21 +92,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const webdavResponse = await fetch(targetUrl, {
             method: method,
             headers: requestHeaders,
-            body: body ? body : undefined,
+            body: body,
+            // @ts-ignore - duplex is needed for streaming bodies in some fetch implementations (Node 18+)
+            duplex: body && typeof body.pipe === 'function' ? 'half' : undefined
         });
 
         // Get response text/blob
-        const contentType = webdavResponse.headers.get('content-type') || '';
+        const responseContentType = webdavResponse.headers.get('content-type') || '';
         let responseData: any;
 
-        if (contentType.includes('application/zip') || contentType.includes('application/octet-stream')) {
+        if (responseContentType.includes('application/zip') || responseContentType.includes('application/octet-stream')) {
             // Binary data (for file downloads)
             const arrayBuffer = await webdavResponse.arrayBuffer();
             const base64 = Buffer.from(arrayBuffer).toString('base64');
             responseData = {
                 type: 'binary',
                 data: base64,
-                contentType: contentType
+                contentType: responseContentType
             };
         } else {
             // Text data (XML, JSON, etc.)
@@ -75,12 +119,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
 
         // Return response
-        // We return the status code from the WebDAV server, but we also include debug info
         return res.status(webdavResponse.status).json({
             ok: webdavResponse.ok,
             status: webdavResponse.status,
             statusText: webdavResponse.statusText,
-            headers: Object.fromEntries(webdavResponse.headers.entries()), // Return headers for debugging (e.g. WWW-Authenticate)
+            headers: Object.fromEntries(webdavResponse.headers.entries()),
             response: responseData
         });
 

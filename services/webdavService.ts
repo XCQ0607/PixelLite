@@ -163,7 +163,7 @@ export const listBackups = async (config: WebDAVConfig): Promise<{ name: string,
 export const generateBackupFilename = (tag: string): string => {
     const dateStr = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
     const cleanTag = tag.replace(/[^a-zA-Z0-9\-_]/g, '');
-    return `PixelLite_Backup_${dateStr}_[${cleanTag}].zip`;
+    return `PixelLite_Backup_${dateStr}_${cleanTag}.zip`;
 };
 
 export const generateBackupZip = async (
@@ -215,7 +215,8 @@ export const createBackup = async (
     config: WebDAVConfig,
     history: ProcessedImage[],
     settings: AppSettings,
-    tag: string
+    tag: string,
+    onProgress?: (progress: number) => void
 ): Promise<void> => {
     // Ensure folder exists before upload
     await ensureDirectoryExists(config);
@@ -225,21 +226,51 @@ export const createBackup = async (
 
     // Upload to PixelLite subdirectory
     const targetUrl = getPixelLiteUrl(config.url) + filename;
+    const proxyUrl = '/api/webdav-proxy';
 
-    // Convert blob to base64 for transfer through proxy
-    const arrayBuffer = await zipBlob.arrayBuffer();
-    const base64Body = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+    return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
 
-    const result = await callProxy(targetUrl, 'PUT', config, {
-        headers: {
-            'Content-Type': 'application/zip'
-        },
-        body: base64Body
+        xhr.upload.addEventListener('progress', (e) => {
+            if (e.lengthComputable && onProgress) {
+                const percentComplete = (e.loaded / e.total) * 100;
+                onProgress(percentComplete);
+            }
+        });
+
+        xhr.addEventListener('load', () => {
+            if (xhr.status >= 200 && xhr.status < 300) {
+                resolve();
+            } else {
+                let errorMessage = `Upload failed with status ${xhr.status}`;
+                try {
+                    const response = JSON.parse(xhr.responseText);
+                    if (response.error) errorMessage = response.message || response.error;
+                } catch (e) {
+                    // Ignore JSON parse error
+                }
+                reject(new Error(errorMessage));
+            }
+        });
+
+        xhr.addEventListener('error', () => {
+            reject(new Error('Network error during upload'));
+        });
+
+        xhr.open('POST', proxyUrl);
+
+        // Set headers for streaming upload via proxy
+        xhr.setRequestHeader('Content-Type', 'application/zip');
+        xhr.setRequestHeader('X-WebDAV-Target', targetUrl);
+        xhr.setRequestHeader('X-WebDAV-Method', 'PUT');
+        xhr.setRequestHeader('X-WebDAV-Credentials', btoa(JSON.stringify({
+            username: config.username,
+            password: config.password
+        })));
+
+        // Send the blob directly
+        xhr.send(zipBlob);
     });
-
-    if (!result.ok && result.status !== 201 && result.status !== 204) {
-        throw new Error(`Upload failed with status ${result.status}`);
-    }
 };
 
 export const parseBackupZip = async (blob: Blob): Promise<{ images: ProcessedImage[], settings?: AppSettings }> => {

@@ -114,7 +114,23 @@ const translations = {
         ai_enhance_prompt_label: 'AI 增强提示词',
         btn_generate: '开始生成',
         generating: '生成中...',
-        ai_enhance_placeholder: '等待生成...'
+        ai_enhance_placeholder: '等待生成...',
+
+        // Backup & Restore
+        backup_tag_label: '备份标签 / 名称',
+        enter_backup_tag: '请输入备份标签',
+        uploading: '上传中...',
+        manage_restore_btn: '管理 / 恢复',
+        or_local: '或 本地操作',
+        save_to_disk: '保存到本地',
+        load_from_disk: '从本地加载',
+        backup_downloaded: '备份已下载',
+        local_backup_failed: '本地备份失败: ',
+        confirm_restore_local: '从 {filename} 恢复？当前历史记录将被合并。',
+        restore_success_count: '成功恢复 {count} 个项目',
+        restore_handler_missing: '恢复处理器未连接',
+        invalid_backup_file: '无效的备份文件: ',
+        backup_error_prefix: '备份错误: ',
     },
     en: {
         title: 'PixelLite Pro',
@@ -215,7 +231,23 @@ const translations = {
         ai_enhance_prompt_label: 'AI Enhance Prompt',
         btn_generate: 'Generate',
         generating: 'Generating...',
-        ai_enhance_placeholder: 'Waiting for generation...'
+        ai_enhance_placeholder: 'Waiting for generation...',
+
+        // Backup & Restore
+        backup_tag_label: 'Backup Tag / Name',
+        enter_backup_tag: 'Please enter a backup tag',
+        uploading: 'Uploading...',
+        manage_restore_btn: 'Manage / Restore',
+        or_local: 'OR LOCAL',
+        save_to_disk: 'Save to Disk',
+        load_from_disk: 'Load from Disk',
+        backup_downloaded: 'Backup downloaded successfully',
+        local_backup_failed: 'Local backup failed: ',
+        confirm_restore_local: 'Restore from {filename}? Current history will be merged.',
+        restore_success_count: 'Restored {count} items successfully',
+        restore_handler_missing: 'Restore handler not connected',
+        invalid_backup_file: 'Invalid backup file: ',
+        backup_error_prefix: 'Backup Error: ',
     }
 };
 

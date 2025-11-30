@@ -551,6 +551,27 @@ function App() {
                 }}
             />
 
+            {currentImage && (
+                <ImageEditorModal
+                    isOpen={showImageEditor}
+                    onClose={() => setShowImageEditor(false)}
+                    imageSrc={currentImage.originalPreview}
+                    t={t}
+                    onSave={async (newImage) => {
+                        if (!currentImage) return;
+                        // Update current image with edited version
+                        // Note: This replaces the "original" in the context of the app
+                        const res = await fetch(newImage);
+                        const blob = await res.blob();
+                        const type = currentImage.originalFile.type;
+                        const file = new File([blob], currentImage.originalFile.name, { type });
+
+                        // Trigger re-processing with new file
+                        processFile(file, currentImage.mode);
+                    }}
+                />
+            )}
+
             <RestoreModal
                 isOpen={showRestoreModal}
                 onClose={() => setShowRestoreModal(false)}
@@ -658,23 +679,7 @@ function App() {
                                 </div>
                             </div>
 
-                            <ImageEditorModal
-                                isOpen={showImageEditor}
-                                onClose={() => setShowImageEditor(false)}
-                                imageSrc={currentImage.originalPreview}
-                                t={t}
-                                onSave={async (newImage) => {
-                                    // Update current image with edited version
-                                    // Note: This replaces the "original" in the context of the app
-                                    const res = await fetch(newImage);
-                                    const blob = await res.blob();
-                                    const type = currentImage.originalFile.type;
-                                    const file = new File([blob], currentImage.originalFile.name, { type });
 
-                                    // Trigger re-processing with new file
-                                    processFile(file, currentImage.mode);
-                                }}
-                            />
 
                             {/* Stats */}
                             <div className="glass-panel rounded-2xl p-6 shadow-xl">

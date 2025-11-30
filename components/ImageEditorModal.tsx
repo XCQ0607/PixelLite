@@ -70,6 +70,10 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ isOpen, onCl
     const [cropStart, setCropStart] = useState<CropState | null>(null);
     const [activeHandle, setActiveHandle] = useState<string | null>(null);
 
+    // Layout State
+    const [displayDims, setDisplayDims] = useState({ width: 0, height: 0 });
+    const containerRef = useRef<HTMLDivElement>(null);
+
     // Reset when opening new image
     useEffect(() => {
         if (isOpen) {
@@ -106,6 +110,7 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ isOpen, onCl
                     // But if currentSrc changed (e.g. crop), history is invalid.
                     // So we only clear.
                 }
+                updateDimensions(); // Update dimensions when canvas initializes
             };
 
             if (img.complete) {
@@ -113,6 +118,43 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ isOpen, onCl
             } else {
                 img.onload = initCanvas;
             }
+        }
+    }, [isOpen, currentSrc]);
+
+    // --- Helper: Update Dimensions ---
+    const updateDimensions = () => {
+        if (!containerRef.current || !imageRef.current) return;
+        const container = containerRef.current;
+        const img = imageRef.current;
+        const padding = 32; // 2rem padding (p-4) or 64 (p-8) - let's be safe with 48
+
+        const containerW = container.clientWidth - padding;
+        const containerH = container.clientHeight - padding;
+        const imgW = img.naturalWidth;
+        const imgH = img.naturalHeight;
+
+        if (imgW === 0 || imgH === 0) return;
+
+        // Calculate scale to fit
+        const scale = Math.min(containerW / imgW, containerH / imgH, 1);
+
+        setDisplayDims({
+            width: imgW * scale,
+            height: imgH * scale
+        });
+    };
+
+    // Listen for resize
+    useEffect(() => {
+        window.addEventListener('resize', updateDimensions);
+        return () => window.removeEventListener('resize', updateDimensions);
+    }, []);
+
+    // Update on open/src change
+    useEffect(() => {
+        if (isOpen) {
+            // Small delay to allow layout to settle
+            setTimeout(updateDimensions, 50);
         }
     }, [isOpen, currentSrc]);
 
@@ -451,7 +493,7 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ isOpen, onCl
                 </div>
 
                 {/* Main Workspace */}
-                <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
+                <div className="flex-1 flex flex-col lg:flex-row overflow-hidden min-h-0">
                     {/* Toolbar (Left on Desktop, Bottom on Mobile) */}
                     <div className="order-2 lg:order-1 w-full lg:w-64 bg-gray-800 border-t lg:border-t-0 lg:border-r border-gray-700 flex flex-row lg:flex-col p-4 gap-4 lg:gap-6 overflow-x-auto lg:overflow-y-auto z-20 shrink-0 h-auto max-h-[30vh] lg:h-full lg:max-h-none">
                         {activeTab === 'draw' && (
@@ -556,13 +598,13 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ isOpen, onCl
                     </div>
 
                     {/* Canvas Area */}
-                    <div className="order-1 lg:order-2 flex-1 bg-[url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAMUlEQVQ4T2NkYGAQYcAP3uCTZhw1gGGYhAGBZIA/nYDCgBDAm9BGDWAAJyRCgLaBCAAgXwixzAS0pgAAAABJRU5ErkJggg==')] bg-repeat flex items-center justify-center overflow-hidden relative p-4 lg:p-8">
+                    <div ref={containerRef} className="order-1 lg:order-2 flex-1 bg-[url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAMUlEQVQ4T2NkYGAQYcAP3uCTZhw1gGGYhAGBZIA/nYDCgBDAm9BGDWAAJyRCgLaBCAAgXwixzAS0pgAAAABJRU5ErkJggg==')] bg-repeat flex items-center justify-center overflow-hidden relative p-4 lg:p-8 min-h-0">
                         <div
                             className="relative shadow-2xl transition-transform duration-300 ease-out"
                             style={{
+                                width: displayDims.width,
+                                height: displayDims.height,
                                 transform: `rotate(${rotation}deg) scaleX(${flipH ? -1 : 1}) scaleY(${flipV ? -1 : 1})`,
-                                maxWidth: '100%',
-                                maxHeight: '100%',
                                 filter: getFilterString()
                             }}
                         >
@@ -570,7 +612,8 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ isOpen, onCl
                                 ref={imageRef}
                                 src={currentSrc}
                                 alt="Editing"
-                                className="max-w-full max-h-[50vh] lg:max-h-[80vh] object-contain block select-none pointer-events-none"
+                                onLoad={updateDimensions}
+                                className="w-full h-full object-contain block select-none pointer-events-none"
                                 draggable={false}
                             />
                             <canvas

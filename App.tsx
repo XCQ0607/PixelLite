@@ -555,6 +555,7 @@ function App() {
                 isOpen={showRestoreModal}
                 onClose={() => setShowRestoreModal(false)}
                 config={settings.webdav}
+                t={t}
                 onRestore={(res) => {
                     // Restore Settings if present
                     // The service now returns { images, settings }

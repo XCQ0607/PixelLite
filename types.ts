@@ -1,4 +1,3 @@
-
 export interface AIData {
   description: string;
   tags: string[];
@@ -21,8 +20,9 @@ export interface ProcessedImage {
   mode: ProcessMode;
   enhanceMethod?: EnhanceMethod; // Track if AI or Algorithm was used
   aiData?: AIData;
-  aiModelUsed?: string; // New: Track which AI model was used for generation
-  aiGeneratedText?: string; // New: Text returned from AI generation
+  aiModelUsed?: string; // Track which AI model was used for generation
+  aiGeneratedText?: string; // Text returned from AI generation
+  outputFormat?: 'original' | 'webp' | 'png' | 'jpeg'; // Track actual output format
 }
 
 export interface CompressionStats {
@@ -44,11 +44,12 @@ export interface AppSettings {
   customBaseUrl: string;
   defaultQuality: number;
   smartCompression: boolean;
-  compressionMode: 'balanced' | 'strict';
+  compressionMode: 'canvas' | 'algorithm'; // 压缩引擎: Canvas (WebP only) 或 Algorithm (Advanced)
+  outputFormat: 'original' | 'webp' | 'png' | 'jpeg'; // 默认输出格式
   defaultProcessMode: ProcessMode;
   enhanceMethod: EnhanceMethod;
-  analysisModel: string; // New: custom model for analysis
-  aiModel: string; // New: custom model name for generation
+  analysisModel: string; // Custom model for analysis
+  aiModel: string; // Custom model name for generation
   aiPrompt: string;
   language: Language;
   webdav: WebDAVConfig;

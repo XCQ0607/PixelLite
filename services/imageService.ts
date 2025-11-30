@@ -1,70 +1,129 @@
-
 import JSZip from 'jszip';
+import UPNG from 'upng-js';
 import { ProcessedImage, ProcessMode } from '../types';
 
 /**
- * Compresses an image file using the Canvas API.
+ * Compresses an image file using dual engines: Canvas (WebP only) or Algorithm (Advanced).
  */
 export const compressImage = async (
-    file: File, 
+    file: File,
     targetQuality: number,
-    mode: 'balanced' | 'strict' = 'balanced'
+    mode: 'canvas' | 'algorithm' = 'canvas',
+    outputFormat: 'original' | 'webp' | 'png' | 'jpeg' = 'original'
 ): Promise<Blob> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = (event) => {
-        const img = new Image();
-        img.src = event.target?.result as string;
-        img.onload = async () => {
-          let width = img.width;
-          let height = img.height;
-          
-          const MAX_DIMENSION = 4096; 
-          if (width > MAX_DIMENSION || height > MAX_DIMENSION) {
-             if (width > height) {
-                 height = (height / width) * MAX_DIMENSION;
-                 width = MAX_DIMENSION;
-             } else {
-                 width = (width / height) * MAX_DIMENSION;
-                 height = MAX_DIMENSION;
-             }
-          }
+    return new Promise(async (resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = async (event) => {
+            const img = new Image();
+            img.src = event.target?.result as string;
+            img.onload = async () => {
+                let width = img.width;
+                let height = img.height;
 
-          const canvas = document.createElement('canvas');
-          const ctx = canvas.getContext('2d');
-          if (!ctx) { reject(new Error("Canvas context unavailable")); return; }
-  
-          canvas.width = width;
-          canvas.height = height;
-          ctx.drawImage(img, 0, 0, width, height);
-          
-          let mimeType = file.type === 'image/png' ? 'image/png' : 'image/jpeg';
-          if (mode === 'strict') mimeType = 'image/webp';
-          
-          let currentQuality = targetQuality >= 1.0 ? 0.92 : targetQuality;
-          
-          const getBlob = (q: number): Promise<Blob | null> => {
-              return new Promise(r => canvas.toBlob(r, mimeType, q));
-          };
+                const MAX_DIMENSION = 4096;
+                if (width > MAX_DIMENSION || height > MAX_DIMENSION) {
+                    if (width > height) {
+                        height = (height / width) * MAX_DIMENSION;
+                        width = MAX_DIMENSION;
+                    } else {
+                        width = (width / height) * MAX_DIMENSION;
+                        height = MAX_DIMENSION;
+                    }
+                }
 
-          let blob = await getBlob(currentQuality);
-          let attempts = 0;
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                if (!ctx) { reject(new Error("Canvas context unavailable")); return; }
 
-          while (blob && blob.size >= file.size && attempts < 6) {
-              currentQuality -= 0.1;
-              if (currentQuality < 0.1) break;
-              blob = await getBlob(currentQuality);
-              attempts++;
-          }
+                canvas.width = width;
+                canvas.height = height;
+                ctx.drawImage(img, 0, 0, width, height);
 
-          if (blob) resolve(blob);
-          else reject(new Error("Compression failed"));
+                try {
+                    // CANVAS MODE: Always WebP
+                    if (mode === 'canvas') {
+                        const blob = await canvasToWebP(canvas, targetQuality);
+                        resolve(blob);
+                        return;
+                    }
+
+                    // ALGORITHM MODE: Advanced compression
+                    const isPNG = file.type === 'image/png';
+                    const desiredFormat = outputFormat === 'original'
+                        ? (isPNG ? 'png' : file.type === 'image/jpeg' ? 'jpeg' : 'webp')
+                        : outputFormat;
+
+                    // Use UPNG.js for PNG output (lossy compression)
+                    if (desiredFormat === 'png') {
+                        const blob = await compressPNGWithUPNG(canvas, targetQuality);
+                        resolve(blob);
+                    } else {
+                        // Use Canvas API for JPEG/WebP output
+                        const mimeType = desiredFormat === 'jpeg' ? 'image/jpeg' : 'image/webp';
+                        const blob = await canvasToBlob(canvas, mimeType, targetQuality);
+                        resolve(blob);
+                    }
+                } catch (error) {
+                    reject(error);
+                }
+            };
+            img.onerror = (err) => reject(err);
         };
-        img.onerror = (err) => reject(err);
-      };
-      reader.onerror = (err) => reject(err);
+        reader.onerror = (err) => reject(err);
     });
+};
+
+/**
+ * Convert canvas to WebP using Canvas API
+ */
+const canvasToWebP = async (canvas: HTMLCanvasElement, quality: number): Promise<Blob> => {
+    const targetQuality = quality >= 1.0 ? 0.92 : quality;
+    const getBlob = (q: number): Promise<Blob | null> => {
+        return new Promise(r => canvas.toBlob(r, 'image/webp', q));
+    };
+
+    let blob = await getBlob(targetQuality);
+    if (!blob) throw new Error("WebP compression failed");
+    return blob;
+};
+
+/**
+ * Convert canvas to specified format using Canvas API
+ */
+const canvasToBlob = async (canvas: HTMLCanvasElement, mimeType: string, quality: number): Promise<Blob> => {
+    const targetQuality = quality >= 1.0 ? 0.92 : quality;
+    const getBlob = (q: number): Promise<Blob | null> => {
+        return new Promise(r => canvas.toBlob(r, mimeType, q));
+    };
+
+    let blob = await getBlob(targetQuality);
+    if (!blob) throw new Error(`${mimeType} compression failed`);
+    return blob;
+};
+
+/**
+ * Compress PNG using UPNG.js (lossy compression)
+ */
+const compressPNGWithUPNG = async (canvas: HTMLCanvasElement, quality: number): Promise<Blob> => {
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error("Canvas context unavailable");
+
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const rgba = imageData.data.buffer;
+
+    // Convert quality (0-1) to UPNG cnum (color palette size)
+    // Higher quality = more colors = larger file
+    const cnum = Math.max(2, Math.min(256, Math.round(quality * 256)));
+
+    try {
+        const compressed = UPNG.encode([rgba], canvas.width, canvas.height, cnum);
+        return new Blob([compressed], { type: 'image/png' });
+    } catch (error) {
+        // Fallback to lossless if lossy fails
+        const compressed = UPNG.encode([rgba], canvas.width, canvas.height, 0);
+        return new Blob([compressed], { type: 'image/png' });
+    }
 };
 
 /**
@@ -99,19 +158,19 @@ export const applyImageEnhancement = async (
                     const h = canvas.height;
 
                     const buff = new Uint8ClampedArray(data);
-                    const mix = intensity; 
+                    const mix = intensity;
 
                     for (let y = 1; y < h - 1; y++) {
                         for (let x = 1; x < w - 1; x++) {
                             const idx = (y * w + x) * 4;
                             for (let c = 0; c < 3; c++) {
-                                const val = 
-                                    buff[idx + c] * 5 + 
-                                    buff[((y-1)*w + x)*4 + c] * -1 +
-                                    buff[((y+1)*w + x)*4 + c] * -1 +
-                                    buff[(y*w + (x-1))*4 + c] * -1 +
-                                    buff[(y*w + (x+1))*4 + c] * -1;
-                                data[idx + c] = Math.min(255, Math.max(0, (val * mix) + (buff[idx+c] * (1-mix))));
+                                const val =
+                                    buff[idx + c] * 5 +
+                                    buff[((y - 1) * w + x) * 4 + c] * -1 +
+                                    buff[((y + 1) * w + x) * 4 + c] * -1 +
+                                    buff[(y * w + (x - 1)) * 4 + c] * -1 +
+                                    buff[(y * w + (x + 1)) * 4 + c] * -1;
+                                data[idx + c] = Math.min(255, Math.max(0, (val * mix) + (buff[idx + c] * (1 - mix))));
                             }
                         }
                     }
@@ -128,7 +187,7 @@ export const applyImageEnhancement = async (
         reader.onerror = (err) => reject(err);
     });
 };
-  
+
 export const formatBytes = (bytes: number, decimals = 2): string => {
     if (bytes === 0) return '0 Bytes';
     const k = 1024;
@@ -147,11 +206,23 @@ export const blobToDataURL = (blob: Blob): Promise<string> => {
     });
 };
 
-export const getCompressedFileName = (originalName: string, ratioOrIntensity: number, mode: ProcessMode = 'compress', aiModelName?: string): string => {
+export const getCompressedFileName = (
+    originalName: string,
+    ratioOrIntensity: number,
+    mode: ProcessMode = 'compress',
+    aiModelName?: string,
+    actualFormat?: string // 'webp', 'png', 'jpeg'
+): string => {
     const lastDotIndex = originalName.lastIndexOf('.');
     const name = lastDotIndex !== -1 ? originalName.substring(0, lastDotIndex) : originalName;
-    const ext = lastDotIndex !== -1 ? originalName.substring(lastDotIndex) : '';
-    
+    const originalExt = lastDotIndex !== -1 ? originalName.substring(lastDotIndex) : '';
+
+    // Determine extension based on actualFormat
+    let ext = originalExt;
+    if (actualFormat === 'webp') ext = '.webp';
+    else if (actualFormat === 'png') ext = '.png';
+    else if (actualFormat === 'jpeg' || actualFormat === 'jpg') ext = '.jpg';
+
     if (mode === 'enhance') {
         if (aiModelName) {
             return `${name}_${aiModelName}${ext}`;
@@ -162,7 +233,7 @@ export const getCompressedFileName = (originalName: string, ratioOrIntensity: nu
 };
 
 export const generateZip = async (
-    images: ProcessedImage[], 
+    images: ProcessedImage[],
     includeOriginals: boolean
 ): Promise<Blob> => {
     const zip = new JSZip();
@@ -184,15 +255,16 @@ export const generateZip = async (
     };
 
     for (const img of images) {
-        let fileName = img.originalFile.name;
-        if (img.compressedBlob.type === 'image/webp') {
-            const parts = fileName.split('.');
-            if (parts.length > 1) parts.pop();
-            fileName = parts.join('.') + '.webp';
-        }
+        // Determine format from blob type or outputFormat
+        let format = 'webp'; // default
+        if (img.compressedBlob.type === 'image/png') format = 'png';
+        else if (img.compressedBlob.type === 'image/jpeg') format = 'jpeg';
+        else if (img.outputFormat) format = img.outputFormat;
 
         const suffixValue = img.mode === 'enhance' ? img.qualityUsed : img.compressionRatio;
-        const processedName = getUniqueName(getCompressedFileName(fileName, suffixValue, img.mode, img.aiModelUsed));
+        const processedName = getUniqueName(
+            getCompressedFileName(img.originalFile.name, suffixValue, img.mode, img.aiModelUsed, format)
+        );
         zip.file(processedName, img.compressedBlob);
 
         if (includeOriginals) {

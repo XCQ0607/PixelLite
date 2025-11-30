@@ -45,7 +45,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             ...s,
             webdav: s.webdav || { url: '', username: '', password: '' },
             customBaseUrl: s.customBaseUrl || '',
-            compressionMode: s.compressionMode || 'balanced',
+            compressionMode: s.compressionMode || 'canvas',
+            outputFormat: s.outputFormat || 'original',
             defaultProcessMode: s.defaultProcessMode || 'compress',
             enhanceMethod: s.enhanceMethod || 'algorithm',
             aiModel: s.aiModel || 'gemini-2.5-flash-image',
@@ -251,23 +252,50 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                                     <div className="grid grid-cols-2 gap-3">
                                         <button
                                             type="button"
-                                            onClick={() => setLocalSettings({ ...localSettings, compressionMode: 'balanced' })}
-                                            className={`p-2 rounded-lg border text-sm transition-all text-left ${localSettings.compressionMode === 'balanced'
-                                                ? 'bg-primary/10 border-primary text-primary'
-                                                : 'bg-white dark:bg-dark border-gray-200 dark:border-gray-700'}`}
+                                            onClick={() => setLocalSettings({ ...localSettings, compressionMode: 'canvas' })}
+                                            className={`p-3 rounded-lg border text-left transition-all ${localSettings.compressionMode === 'canvas'
+                                                    ? 'bg-primary/10 border-primary text-primary dark:bg-primary/20'
+                                                    : 'bg-white dark:bg-dark border-gray-200 dark:border-gray-700 hover:border-gray-300'
+                                                }`}
                                         >
-                                            <div className="font-bold text-xs">{t('mode_balanced_title')}</div>
+                                            <div className="font-bold text-sm mb-1">{t('engine_canvas')}</div>
+                                            <div className="text-xs opacity-70">{t('engine_canvas_desc')}</div>
                                         </button>
                                         <button
                                             type="button"
-                                            onClick={() => setLocalSettings({ ...localSettings, compressionMode: 'strict' })}
-                                            className={`p-2 rounded-lg border text-sm transition-all text-left ${localSettings.compressionMode === 'strict'
-                                                ? 'bg-primary/10 border-primary text-primary'
-                                                : 'bg-white dark:bg-dark border-gray-200 dark:border-gray-700'}`}
+                                            onClick={() => setLocalSettings({ ...localSettings, compressionMode: 'algorithm' })}
+                                            className={`p-3 rounded-lg border text-left transition-all ${localSettings.compressionMode === 'algorithm'
+                                                    ? 'bg-primary/10 border-primary text-primary dark:bg-primary/20'
+                                                    : 'bg-white dark:bg-dark border-gray-200 dark:border-gray-700 hover:border-gray-300'
+                                                }`}
                                         >
-                                            <div className="font-bold text-xs">{t('mode_strict_title')}</div>
+                                            <div className="font-bold text-sm mb-1">{t('engine_algorithm')}</div>
+                                            <div className="text-xs opacity-70">{t('engine_algorithm_desc')}</div>
                                         </button>
                                     </div>
+                                </div>
+
+                                {/* Output Format Setting */}
+                                <div className="space-y-2">
+                                    <label className="block text-sm font-medium text-gray-600 dark:text-gray-400">
+                                        {t('output_format')}
+                                    </label>
+                                    <select
+                                        value={localSettings.outputFormat}
+                                        onChange={(e) => setLocalSettings({ ...localSettings, outputFormat: e.target.value as any })}
+                                        disabled={localSettings.compressionMode === 'canvas'}
+                                        className="w-full p-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-dark text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        <option value="original">{t('format_original')}</option>
+                                        <option value="webp">{t('format_webp')}</option>
+                                        <option value="png">{t('format_png')}</option>
+                                        <option value="jpeg">{t('format_jpeg')}</option>
+                                    </select>
+                                    {localSettings.compressionMode === 'canvas' && (
+                                        <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                                            ⚠️ {t('format_note_canvas')}
+                                        </p>
+                                    )}
                                 </div>
 
                                 <div className="flex items-center justify-between">

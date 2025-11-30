@@ -778,51 +778,6 @@ function App() {
                                     )}
                                 </div>
 
-                                {/* Output Format Selection Card */}
-                                {(() => {
-                                    const isCanvasMode = processMode === 'compress' && settings.compressionMode === 'canvas';
-                                    const isAlgorithmMode = processMode === 'compress' && settings.compressionMode === 'algorithm';
-                                    const isAIEnhance = processMode === 'enhance' && settings.enhanceMethod === 'ai';
-                                    const shouldShowFormatCard = isAlgorithmMode || (processMode === 'enhance');
-
-                                    if (!shouldShowFormatCard) return null;
-
-                                    return (
-                                        <div className="mt-4 p-4 bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800/50 dark:to-gray-800/30 rounded-xl border border-gray-200 dark:border-gray-700 space-y-3">
-                                            <div className="flex items-center justify-between">
-                                                <h4 className="text-sm font-bold text-gray-700 dark:text-gray-300 flex items-center gap-2">
-                                                    <ImageIcon size={16} className="text-primary" />
-                                                    {t('output_format_card_title')}
-                                                </h4>
-                                                <span className="text-xs text-gray-500 dark:text-gray-400 font-mono">
-                                                    {isCanvasMode ? 'WebP' : settings.outputFormat.toUpperCase()}
-                                                </span>
-                                            </div>
-                                            <select
-                                                value={settings.outputFormat}
-                                                onChange={(e) => setSettings(prev => ({ ...prev, outputFormat: e.target.value as any }))}
-                                                disabled={isCanvasMode || isAIEnhance}
-                                                className="w-full p-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-dark text-gray-900 dark:text-gray-100 text-sm font-medium focus:ring-2 focus:ring-primary outline-none disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                                            >
-                                                <option value="original">{t('format_original')}</option>
-                                                <option value="webp">{t('format_webp')}</option>
-                                                <option value="png">{t('format_png')}</option>
-                                                <option value="jpeg">{t('format_jpeg')}</option>
-                                            </select>
-                                            {isCanvasMode && (
-                                                <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1 bg-amber-50 dark:bg-amber-900/20 p-2 rounded">
-                                                    <span className="font-bold">⚠️</span> {t('format_note_canvas')}
-                                                </p>
-                                            )}
-                                            {isAIEnhance && (
-                                                <p className="text-xs text-blue-600 dark:text-blue-400 flex items-center gap-1 bg-blue-50 dark:bg-blue-900/20 p-2 rounded">
-                                                    <span className="font-bold">ℹ️</span> {t('format_note_ai')}
-                                                </p>
-                                            )}
-                                        </div>
-                                    );
-                                })()}
-
                                 {!isPendingAiEnhance && (
                                     <div className="space-y-3 pt-2 border-t border-gray-200 dark:border-gray-700">
                                         <button

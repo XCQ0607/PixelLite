@@ -958,7 +958,8 @@ function App() {
                                     // Note: This replaces the "original" in the context of the app
                                     const res = await fetch(newImage);
                                     const blob = await res.blob();
-                                    const file = new File([blob], currentImage.originalFile.name, { type: 'image/png' });
+                                    const type = currentImage.originalFile.type;
+                                    const file = new File([blob], currentImage.originalFile.name, { type });
 
                                     // Trigger re-processing with new file
                                     processFile(file, currentImage.mode);

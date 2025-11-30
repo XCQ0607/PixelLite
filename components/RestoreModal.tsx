@@ -28,6 +28,15 @@ export const RestoreModal: React.FC<RestoreModalProps> = ({ isOpen, onClose, con
 
     const loadBackups = async () => {
         console.log('[RestoreModal] Loading backups from:', config.url);
+
+        // Check if URL is empty
+        if (!config.url || config.url.trim() === '') {
+            console.warn('[RestoreModal] WebDAV URL is empty. Please save settings first.');
+            setBackups([]);
+            setIsLoading(false);
+            return;
+        }
+
         setIsLoading(true);
         try {
             const list = await listBackups(config);
@@ -179,6 +188,16 @@ export const RestoreModal: React.FC<RestoreModalProps> = ({ isOpen, onClose, con
                         <div className="flex flex-col items-center justify-center h-40 gap-3 text-gray-500">
                             <Loader2 className="animate-spin" size={32} />
                             <span>{t('fetching_backups')}</span>
+                        </div>
+                    ) : (!config.url || config.url.trim() === '') ? (
+                        <div className="text-center py-10 space-y-3">
+                            <div className="text-amber-600 dark:text-amber-400 text-5xl">⚠️</div>
+                            <p className="text-gray-700 dark:text-gray-300 font-medium">
+                                {t('webdav_missing_url')}
+                            </p>
+                            <p className="text-sm text-gray-500">
+                                Please configure and save WebDAV server URL in settings first
+                            </p>
                         </div>
                     ) : backups.length === 0 ? (
                         <div className="text-center text-gray-500 py-10">

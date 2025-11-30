@@ -135,6 +135,23 @@ export interface TranslationKeys {
     editor_crop_tip: string;
     edit_view: string;
 
+    // RestoreModal
+    restore_modal_title: string;
+    refresh_list: string;
+    select_all_backups: string;
+    backups_selected: string;
+    download_zip_btn: string;
+    batch_delete_btn: string;
+    restore_backup_btn: string;
+    fetching_backups: string;
+    no_backups_found: string;
+    confirm_restore_backup: string;
+    restored_items_count: string;
+    restore_backup_failed: string;
+    confirm_batch_delete_backups: string;
+    batch_delete_backups_failed: string;
+    batch_download_backups_failed: string;
+
     // Compression engine and output format
     compression_engine: string;
     engine_canvas: string;
@@ -306,6 +323,22 @@ export const translations: Record<Language, TranslationKeys> = {
         format_note_canvas: '注意：极速模式仅支持 WebP 输出',
         format_note_ai: '注意：AI 模式不支持自定义格式',
         format_will_be: '输出将为',
+
+        restore_modal_title: '备份管理',
+        refresh_list: '刷新列表',
+        select_all_backups: '全选',
+        backups_selected: '已选 {count} 个',
+        download_zip_btn: 'ZIP',
+        batch_delete_btn: '删除',
+        restore_backup_btn: '恢复',
+        fetching_backups: '获取备份列表中...',
+        no_backups_found: '未找到备份文件',
+        confirm_restore_backup: '确认从 {filename} 恢复？',
+        restored_items_count: '成功恢复 {count} 个项目',
+        restore_backup_failed: '恢复失败',
+        confirm_batch_delete_backups: '确认删除 {count} 个备份？',
+        batch_delete_backups_failed: '批量删除失败',
+        batch_download_backups_failed: '批量下载失败',
     },
     en: {
         title: 'PixelLite Pro',
@@ -457,5 +490,21 @@ export const translations: Record<Language, TranslationKeys> = {
         format_note_canvas: 'Note: Fast Mode only supports WebP output',
         format_note_ai: 'Note: AI Mode does not support custom format',
         format_will_be: 'Output will be',
+
+        restore_modal_title: 'Backup Manager',
+        refresh_list: 'Refresh',
+        select_all_backups: 'Select All',
+        backups_selected: '{count} selected',
+        download_zip_btn: 'ZIP',
+        batch_delete_btn: 'Delete',
+        restore_backup_btn: 'Restore',
+        fetching_backups: 'Fetching backups...',
+        no_backups_found: 'No backups found',
+        confirm_restore_backup: 'Restore from {filename}?',
+        restored_items_count: 'Restored {count} items',
+        restore_backup_failed: 'Restore failed',
+        confirm_batch_delete_backups: 'Delete {count} backups?',
+        batch_delete_backups_failed: 'Batch delete failed',
+        batch_download_backups_failed: 'Batch download failed',
     }
 };

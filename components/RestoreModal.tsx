@@ -9,9 +9,10 @@ interface RestoreModalProps {
     onClose: () => void;
     config: WebDAVConfig;
     onRestore: (data: { images: ProcessedImage[], settings?: AppSettings }) => void;
+    t: (key: string) => string; // translation function
 }
 
-export const RestoreModal: React.FC<RestoreModalProps> = ({ isOpen, onClose, config, onRestore }) => {
+export const RestoreModal: React.FC<RestoreModalProps> = ({ isOpen, onClose, config, onRestore, t }) => {
     const [backups, setBackups] = useState<{ name: string, lastModified: string }[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [isRestoring, setIsRestoring] = useState(false);
@@ -26,29 +27,34 @@ export const RestoreModal: React.FC<RestoreModalProps> = ({ isOpen, onClose, con
     }, [isOpen, config]);
 
     const loadBackups = async () => {
+        console.log('[RestoreModal] Loading backups from:', config.url);
         setIsLoading(true);
         try {
             const list = await listBackups(config);
+            console.log('[RestoreModal] Backups loaded:', list);
             setBackups(list);
         } catch (e) {
-            // alert("Failed to load backups. Check config.");
+            console.error('[RestoreModal] Failed to load backups:', e);
+            // Don't show alert, just log
         } finally {
             setIsLoading(false);
         }
     };
 
     const handleRestore = async (filename: string) => {
-        if (!confirm(`Are you sure you want to restore ${filename}? It will merge with current history.`)) return;
+        const confirmMsg = t('confirm_restore_backup').replace('{filename}', filename);
+        if (!confirm(confirmMsg)) return;
 
         setIsRestoring(true);
         try {
             const result = await restoreBackup(config, filename);
             onRestore(result);
-            // alert(`Restored ${result.images.length} items successfully.`);
+            const successMsg = t('restored_items_count').replace('{count}', result.images.length.toString());
+            alert(successMsg);
             onClose();
         } catch (e: any) {
             console.error(e);
-            alert("Restore failed: " + e.message);
+            alert(t('restore_backup_failed') + ': ' + e.message);
         } finally {
             setIsRestoring(false);
         }
@@ -70,14 +76,15 @@ export const RestoreModal: React.FC<RestoreModalProps> = ({ isOpen, onClose, con
     };
 
     const handleBatchDelete = async () => {
-        if (!confirm(`Delete ${selectedBackups.size} backups? This cannot be undone.`)) return;
+        const confirmMsg = t('confirm_batch_delete_backups').replace('{count}', selectedBackups.size.toString());
+        if (!confirm(confirmMsg)) return;
         setIsProcessing(true);
         try {
             await deleteBackups(config, Array.from(selectedBackups));
             setSelectedBackups(new Set());
             await loadBackups();
         } catch (e: any) {
-            alert("Batch delete failed: " + e.message);
+            alert(t('batch_delete_backups_failed') + ': ' + e.message);
         } finally {
             setIsProcessing(false);
         }
@@ -96,15 +103,16 @@ export const RestoreModal: React.FC<RestoreModalProps> = ({ isOpen, onClose, con
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
         } catch (e: any) {
-            alert("Batch download failed: " + e.message);
+            alert(t('batch_download_backups_failed') + ': ' + e.message);
         } finally {
             setIsProcessing(false);
         }
     };
 
     const getTagFromName = (name: string) => {
-        const match = name.match(/\[(.*?)\]/);
-        return match ? match[1] : '';
+        // Extract tag from filename: PixelLite_Backup_2024-11-30T12-34-56_tag.zip
+        const parts = name.replace('.zip', '').split('_');
+        return parts.length > 3 ? parts.slice(3).join('_') : '';
     };
 
     if (!isOpen) return null;
@@ -114,9 +122,21 @@ export const RestoreModal: React.FC<RestoreModalProps> = ({ isOpen, onClose, con
             <div className="bg-white dark:bg-card w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
                 <div className="p-4 border-b dark:border-gray-700 flex justify-between items-center bg-gray-50 dark:bg-gray-800">
                     <h3 className="font-bold flex items-center gap-2 text-lg">
-                        <RefreshCw size={20} /> Backup Manager
+                        <Archive size={20} className="text-primary" /> {t('restore_modal_title')}
                     </h3>
-                    <button onClick={onClose} className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full"><X size={20} /></button>
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={loadBackups}
+                            disabled={isLoading}
+                            className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition-colors disabled:opacity-50"
+                            title={t('refresh_list')}
+                        >
+                            <RefreshCw size={18} className={isLoading ? 'animate-spin' : ''} />
+                        </button>
+                        <button onClick={onClose} className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition-colors">
+                            <X size={20} />
+                        </button>
+                    </div>
                 </div>
 
                 {/* Toolbar */}
@@ -127,10 +147,10 @@ export const RestoreModal: React.FC<RestoreModalProps> = ({ isOpen, onClose, con
                             className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 py-1.5 text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
                         >
                             {selectedBackups.size > 0 && selectedBackups.size === backups.length ? <CheckSquare size={16} className="text-primary" /> : <Square size={16} />}
-                            Select All
+                            {t('select_all_backups')}
                         </button>
                         <span className="text-xs text-gray-400 whitespace-nowrap">
-                            {selectedBackups.size} selected
+                            {t('backups_selected').replace('{count}', selectedBackups.size.toString())}
                         </span>
                     </div>
                     <div className="flex items-center gap-2 w-full sm:w-auto">
@@ -140,8 +160,8 @@ export const RestoreModal: React.FC<RestoreModalProps> = ({ isOpen, onClose, con
                             className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-1.5 text-sm font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:text-blue-400 dark:hover:bg-blue-900/40 rounded-lg transition-colors disabled:opacity-50"
                         >
                             {isProcessing ? <Loader2 size={16} className="animate-spin" /> : <Archive size={16} />}
-                            <span className="hidden sm:inline">Download ZIP</span>
-                            <span className="sm:hidden">ZIP</span>
+                            <span className="hidden sm:inline">Download {t('download_zip_btn')}</span>
+                            <span className="sm:hidden">{t('download_zip_btn')}</span>
                         </button>
                         <button
                             onClick={handleBatchDelete}
@@ -149,7 +169,7 @@ export const RestoreModal: React.FC<RestoreModalProps> = ({ isOpen, onClose, con
                             className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-1.5 text-sm font-medium text-red-600 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:text-red-400 dark:hover:bg-red-900/40 rounded-lg transition-colors disabled:opacity-50"
                         >
                             {isProcessing ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
-                            Delete
+                            {t('batch_delete_btn')}
                         </button>
                     </div>
                 </div>
@@ -158,11 +178,11 @@ export const RestoreModal: React.FC<RestoreModalProps> = ({ isOpen, onClose, con
                     {isLoading ? (
                         <div className="flex flex-col items-center justify-center h-40 gap-3 text-gray-500">
                             <Loader2 className="animate-spin" size={32} />
-                            <span>Fetching backups...</span>
+                            <span>{t('fetching_backups')}</span>
                         </div>
                     ) : backups.length === 0 ? (
                         <div className="text-center text-gray-500 py-10">
-                            No backups found in remote directory.
+                            {t('no_backups_found')}
                         </div>
                     ) : (
                         <div className="space-y-2">
@@ -202,10 +222,10 @@ export const RestoreModal: React.FC<RestoreModalProps> = ({ isOpen, onClose, con
                                             disabled={isRestoring || isProcessing}
                                             onClick={(e) => { e.stopPropagation(); handleRestore(file.name); }}
                                             className="flex-shrink-0 px-3 py-1.5 text-xs font-medium bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 rounded-lg transition-colors flex items-center gap-1"
-                                            title="Restore this backup"
+                                            title={t('restore_backup_btn')}
                                         >
                                             {isRestoring ? <Loader2 className="animate-spin" size={14} /> : <Download size={14} />}
-                                            <span className="hidden sm:inline">Restore</span>
+                                            <span className="hidden sm:inline">{t('restore_backup_btn')}</span>
                                         </button>
                                     </div>
                                 )

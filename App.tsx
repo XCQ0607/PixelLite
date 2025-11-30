@@ -17,20 +17,6 @@ import { ImageEditorModal } from './components/ImageEditorModal';
 // Translation Dictionary
 const translations = {
     zh: {
-        title: 'PixelLite Pro',
-        hero_title_prefix: '智能',
-        slogans: ['图片压缩', '画质增强', '无损优化'],
-        hero_desc: '一站式图片处理工坊。压缩体积，增强画质，智能分析。数据本地处理，安全无忧。',
-        upload_area: '点击上传，拖拽，或 Ctrl+V 粘贴图片',
-        formats: '支持 PNG, JPG, JPEG, WebP',
-        image_info: '图片信息',
-        original_size: '原始大小',
-        compressed_size: '处理后',
-        savings: '变化',
-        compression_strength: '压缩强度',
-        enhance_strength: '清晰度增强',
-        slider_tip: '调整滑块以平衡效果',
-        processing: '正在处理...',
         save_history: '确认并保存',
         saved_history: '已保存',
         change_image: '换一张',
@@ -74,6 +60,7 @@ const translations = {
         compressing: '处理中...',
         webdav_missing_url: '请先配置 WebDAV URL',
 
+
         // Settings specific
         settings_tab_general: '通用设置',
         settings_tab_modes: '处理模式',
@@ -87,20 +74,6 @@ const translations = {
         api_base_url: 'API Base URL',
         api_base_url_desc: '可选：覆盖默认 Google API 地址 (如使用反向代理)。',
         webdav_help: '支持 WebDAV 协议的网盘 (如坚果云, Nextcloud, Alist)',
-        webdav_server_url: '服务器地址 (Server URL)',
-        webdav_username: '用户名 (Username)',
-        webdav_password: '密码 (Password)',
-        test_connection: '测试连接',
-        connection_success: '连接成功！',
-        connection_failed: '连接失败',
-        backup_btn: '备份',
-        restore_btn: '恢复',
-        backup_success: '备份成功！',
-        restore_success: '恢复成功！',
-        enhance_mode: '清晰增强',
-        enhance_mode_title: '画质增强设置',
-        enhance_mode_desc: '通过图像卷积算法增强边缘清晰度和对比度。',
-        default_process_mode: '默认处理模式',
         mode_compress: '压缩模式',
         mode_enhance: '增强模式',
         switch_to_compress: '切换到压缩模式',
@@ -133,6 +106,33 @@ const translations = {
         restore_handler_missing: '恢复处理器未连接',
         invalid_backup_file: '无效的备份文件: ',
         backup_error_prefix: '备份错误: ',
+
+        // Image Editor
+        editor_title: '图片编辑器',
+        editor_save: '保存修改',
+        editor_reset: '重置',
+        editor_rotate_left: '向左旋转',
+        editor_rotate_right: '向右旋转',
+        editor_flip_h: '水平翻转',
+        editor_flip_v: '垂直翻转',
+        editor_pen: '画笔',
+        editor_eraser: '橡皮擦',
+        editor_color: '颜色',
+        editor_size: '粗细',
+        editor_crop: '裁剪',
+        editor_adjust: '调整',
+        editor_draw: '涂鸦',
+        editor_apply: '应用',
+        editor_cancel: '取消',
+        editor_brightness: '亮度',
+        editor_contrast: '对比度',
+        editor_saturation: '饱和度',
+        editor_filter_none: '原图',
+        editor_filter_grayscale: '黑白',
+        editor_filter_sepia: '复古',
+        editor_filter_invert: '反色',
+        editor_filter_blur: '模糊',
+        edit_view: '编辑 / 查看',
     },
     en: {
         title: 'PixelLite Pro',
@@ -251,6 +251,33 @@ const translations = {
         restore_handler_missing: 'Restore handler not connected',
         invalid_backup_file: 'Invalid backup file: ',
         backup_error_prefix: 'Backup Error: ',
+
+        // Image Editor
+        editor_title: 'Image Editor',
+        editor_save: 'Save Changes',
+        editor_reset: 'Reset',
+        editor_rotate_left: 'Rotate Left',
+        editor_rotate_right: 'Rotate Right',
+        editor_flip_h: 'Flip Horizontal',
+        editor_flip_v: 'Flip Vertical',
+        editor_pen: 'Pen',
+        editor_eraser: 'Eraser',
+        editor_color: 'Color',
+        editor_size: 'Size',
+        editor_crop: 'Crop',
+        editor_adjust: 'Adjust',
+        editor_draw: 'Draw',
+        editor_apply: 'Apply',
+        editor_cancel: 'Cancel',
+        editor_brightness: 'Brightness',
+        editor_contrast: 'Contrast',
+        editor_saturation: 'Saturation',
+        editor_filter_none: 'Normal',
+        editor_filter_grayscale: 'Grayscale',
+        editor_filter_sepia: 'Sepia',
+        editor_filter_invert: 'Invert',
+        editor_filter_blur: 'Blur',
+        edit_view: 'Edit / View',
     }
 };
 
@@ -874,7 +901,7 @@ function App() {
                                 />
                                 <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-xl">
                                     <span className="text-white font-bold flex items-center gap-2">
-                                        <PenTool size={20} /> Edit / View
+                                        <PenTool size={20} /> {t('edit_view')}
                                     </span>
                                 </div>
                             </div>
@@ -883,6 +910,7 @@ function App() {
                                 isOpen={showImageEditor}
                                 onClose={() => setShowImageEditor(false)}
                                 imageSrc={currentImage.originalPreview}
+                                t={t}
                                 onSave={async (newImage) => {
                                     // Update current image with edited version
                                     // Note: This replaces the "original" in the context of the app

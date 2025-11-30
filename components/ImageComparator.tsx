@@ -11,6 +11,7 @@ interface ImageComparatorProps {
 export const ImageComparator: React.FC<ImageComparatorProps> = ({ beforeSrc, afterSrc, beforeLabel, afterLabel }) => {
   const [percentage, setPercentage] = useState(50);
   const [isResizing, setIsResizing] = useState(false);
+  const [containerWidth, setContainerWidth] = useState<number | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const handleMove = useCallback((clientX: number) => {
@@ -24,7 +25,7 @@ export const ImageComparator: React.FC<ImageComparatorProps> = ({ beforeSrc, aft
 
   const handleMouseDown = () => setIsResizing(true);
   const handleMouseUp = useCallback(() => setIsResizing(false), []);
-  
+
   const handleMouseMove = useCallback((e: MouseEvent) => {
     if (isResizing) {
       handleMove(e.clientX);
@@ -36,6 +37,19 @@ export const ImageComparator: React.FC<ImageComparatorProps> = ({ beforeSrc, aft
       handleMove(e.touches[0].clientX);
     }
   }, [isResizing, handleMove]);
+
+  // Measure container width on mount and resize
+  useEffect(() => {
+    const updateWidth = () => {
+      if (containerRef.current) {
+        setContainerWidth(containerRef.current.clientWidth);
+      }
+    };
+
+    updateWidth();
+    window.addEventListener('resize', updateWidth);
+    return () => window.removeEventListener('resize', updateWidth);
+  }, []);
 
   useEffect(() => {
     if (isResizing) {
@@ -54,7 +68,7 @@ export const ImageComparator: React.FC<ImageComparatorProps> = ({ beforeSrc, aft
   }, [isResizing, handleMouseMove, handleMouseUp, handleTouchMove]);
 
   return (
-    <div 
+    <div
       ref={containerRef}
       className="relative w-full h-[400px] md:h-[500px] overflow-hidden rounded-xl cursor-col-resize select-none shadow-2xl group"
       onMouseDown={(e) => {
@@ -67,44 +81,45 @@ export const ImageComparator: React.FC<ImageComparatorProps> = ({ beforeSrc, aft
       }}
     >
       {/* Background Image (After / Compressed) */}
-      <img 
-        src={afterSrc} 
-        alt="Compressed" 
-        className="absolute top-0 left-0 w-full h-full object-contain bg-gray-100/50 dark:bg-gray-800/50" 
+      <img
+        src={afterSrc}
+        alt="Compressed"
+        className="absolute top-0 left-0 w-full h-full object-contain bg-gray-100/50 dark:bg-gray-800/50"
         draggable={false}
       />
-      
+
       {/* Label for After */}
-      <div className="absolute top-4 right-4 bg-black/50 text-white text-xs px-2 py-1 rounded backdrop-blur-sm z-10">
+      <div className="absolute top-4 right-4 bg-black/60 text-white text-xs px-2.5 py-1.5 rounded-lg backdrop-blur-md z-20 font-medium tracking-wide shadow-lg border border-white/10 pointer-events-none select-none">
         {afterLabel}
       </div>
 
+      {/* Label for Before - Moved OUTSIDE the clipped div to prevent clipping */}
+      <div className="absolute top-4 left-4 bg-black/60 text-white text-xs px-2.5 py-1.5 rounded-lg backdrop-blur-md z-20 font-medium tracking-wide shadow-lg border border-white/10 pointer-events-none select-none">
+        {beforeLabel}
+      </div>
+
       {/* Foreground Image (Before / Original) - Clipped */}
-      <div 
-        className="absolute top-0 left-0 h-full overflow-hidden border-r-2 border-white/80 shadow-[0_0_20px_rgba(0,0,0,0.5)]"
+      <div
+        className="absolute top-0 left-0 h-full overflow-hidden shadow-[0_0_20px_rgba(0,0,0,0.5)] z-10"
         style={{ width: `${percentage}%` }}
       >
-        <img 
-          src={beforeSrc} 
-          alt="Original" 
-          className="absolute top-0 left-0 max-w-none h-full object-contain bg-gray-100/50 dark:bg-gray-800/50" 
-          // Match parent width
-          style={{ width: containerRef.current?.clientWidth || '100%' }}
+        <img
+          src={beforeSrc}
+          alt="Original"
+          className={`absolute top-0 left-0 max-w-none h-full object-contain bg-gray-100/50 dark:bg-gray-800/50 transition-opacity duration-200 ${containerWidth ? 'opacity-100' : 'opacity-0'}`}
+          // Match parent width using state
+          style={{ width: containerWidth ? `${containerWidth}px` : '100%' }}
           draggable={false}
         />
-        {/* Label for Before */}
-         <div className="absolute top-4 left-4 bg-black/50 text-white text-xs px-2 py-1 rounded backdrop-blur-sm z-20">
-          {beforeLabel}
-        </div>
       </div>
 
       {/* Slider Handle */}
-      <div 
-        className="absolute top-0 bottom-0 w-1 bg-white cursor-col-resize z-30"
+      <div
+        className="absolute top-0 bottom-0 w-0.5 bg-white cursor-col-resize z-30 shadow-[0_0_10px_rgba(0,0,0,0.3)] -translate-x-1/2 flex flex-col justify-center items-center"
         style={{ left: `${percentage}%` }}
       >
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-8 h-8 bg-white rounded-full shadow-lg flex items-center justify-center text-primary">
-          <ChevronsLeftRight size={16} />
+        <div className="w-8 h-8 bg-white rounded-full shadow-xl flex items-center justify-center text-primary hover:scale-110 transition-transform duration-200">
+          <ChevronsLeftRight size={16} strokeWidth={2.5} />
         </div>
       </div>
     </div>

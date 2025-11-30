@@ -14,10 +14,6 @@ import { ProcessedImage, AppSettings, ProcessMode } from './types';
 import { StorageService } from './services/storageService';
 import { ImageEditorModal } from './components/ImageEditorModal';
 import { translations, TranslationKeys } from './translations';
-import { useDynamicTitle } from './hooks/useDynamicTitle';
-import { InteractiveOverlay } from './components/InteractiveOverlay';
-import { CustomContextMenu } from './components/CustomContextMenu';
-import { PWAInstallButton } from './components/PWAInstallButton';
 
 
 
@@ -84,9 +80,6 @@ function App() {
     const [isDark, setIsDark] = useState(true);
     const [currentImage, setCurrentImage] = useState<ProcessedImage | null>(null);
     const [history, setHistory] = useState<ProcessedImage[]>([]);
-
-    // Dynamic Title Hook
-    useDynamicTitle();
 
     // UI States
     const [isProcessing, setIsProcessing] = useState(false);
@@ -156,6 +149,15 @@ function App() {
             document.documentElement.classList.remove('dark');
         }
     }, [isDark]);
+
+    // Mouse Move Effect
+    useEffect(() => {
+        const handleMouseMove = (e: MouseEvent) => {
+            setMousePos({ x: e.clientX, y: e.clientY });
+        };
+        window.addEventListener('mousemove', handleMouseMove);
+        return () => window.removeEventListener('mousemove', handleMouseMove);
+    }, []);
 
     const getSmartQuality = (size: number): number => {
         const MB = 1024 * 1024;
@@ -497,8 +499,6 @@ function App() {
                 '--mouse-y': `${mousePos.y}px`,
             } as React.CSSProperties}
         >
-            <InteractiveOverlay />
-            <CustomContextMenu isDark={isDark} onToggleTheme={() => setIsDark(!isDark)} />
             <div className="fixed top-0 left-0 w-full h-full overflow-hidden -z-10 bg-gray-50 dark:bg-dark">
                 {/* Mouse Follower Blob */}
                 <div
@@ -589,7 +589,6 @@ function App() {
                         </h1>
                     </div>
                     <div className="flex items-center gap-3">
-                        <PWAInstallButton />
                         <button onClick={() => setShowDataManager(true)} className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors text-gray-600 dark:text-gray-300">
                             <Database size={20} />
                         </button>

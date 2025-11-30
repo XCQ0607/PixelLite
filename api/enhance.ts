@@ -1,5 +1,5 @@
-import { GoogleGenAI } from "@google/genai";
 
+import { GoogleGenAI } from "@google/genai";
 import { VercelRequest, VercelResponse } from '@vercel/node';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -7,7 +7,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(405).json({ error: 'Method Not Allowed' });
     }
 
-    const { image, prompt, apiKey, model, baseUrl } = req.body;
+    const { image, prompt, apiKey, model = 'gemini-2.5-flash-image', baseUrl } = req.body;
 
     // Use provided API key or fallback to environment variable
     const key = apiKey || process.env.GEMINI_API_KEY;
@@ -41,19 +41,46 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         // Check for image in response
         const parts = response.candidates?.[0]?.content?.parts;
+        let foundImage = null;
+        let foundMimeType = null;
+        let accumulatedText = "";
+
         if (parts) {
             for (const part of parts) {
                 if (part.inlineData && part.inlineData.data) {
-                    // Return the base64 image directly
-                    return res.status(200).json({
-                        image: part.inlineData.data,
-                        mimeType: part.inlineData.mimeType || 'image/png'
-                    });
+                    foundImage = part.inlineData.data;
+                    foundMimeType = part.inlineData.mimeType || 'image/png';
+                }
+
+                // Check for markdown image in text
+                if (part.text) {
+                    let text = part.text;
+                    const match = text.match(/!\[.*?\]\(data:(.*?);base64,(.*?)\)/);
+                    if (match) {
+                        foundMimeType = match[1];
+                        foundImage = match[2];
+                        // Remove the image markdown from the text
+                        text = text.replace(match[0], '').trim();
+                    }
+                    if (text) {
+                        accumulatedText += text + "\n";
+                    }
                 }
             }
         }
 
-        return res.status(500).json({ error: "AI did not return an image part." });
+        if (foundImage || accumulatedText) {
+            return res.status(200).json({
+                image: foundImage,
+                mimeType: foundMimeType,
+                text: accumulatedText.trim()
+            });
+        }
+
+        // If neither image nor text found, return the full response for debugging
+        return res.status(200).json({
+            text: JSON.stringify(response, null, 2)
+        });
 
     } catch (error: any) {
         console.error("AI Generation Error:", error);

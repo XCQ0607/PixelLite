@@ -22,6 +22,7 @@ export interface ProcessedImage {
   enhanceMethod?: EnhanceMethod; // Track if AI or Algorithm was used
   aiData?: AIData;
   aiModelUsed?: string; // New: Track which AI model was used for generation
+  aiGeneratedText?: string; // New: Text returned from AI generation
 }
 
 export interface CompressionStats {

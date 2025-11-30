@@ -42,7 +42,7 @@ export const generateEnhancedImage = async (
   model: string,
   apiKey: string,
   baseUrl?: string
-): Promise<Blob | null> => {
+): Promise<{ blob: Blob, text?: string } | null> => {
   try {
     const response = await fetch('/api/enhance', {
       method: 'POST',
@@ -65,6 +65,7 @@ export const generateEnhancedImage = async (
 
     const data = await response.json();
 
+    let blob: Blob | undefined;
     if (data.image) {
       const byteCharacters = atob(data.image);
       const byteNumbers = new Array(byteCharacters.length);
@@ -72,10 +73,14 @@ export const generateEnhancedImage = async (
         byteNumbers[i] = byteCharacters.charCodeAt(i);
       }
       const byteArray = new Uint8Array(byteNumbers);
-      return new Blob([byteArray], { type: data.mimeType || 'image/png' });
+      blob = new Blob([byteArray], { type: data.mimeType || 'image/png' });
     }
 
-    throw new Error("No image returned from API");
+    if (blob || data.text) {
+      return { blob: blob as Blob, text: data.text };
+    }
+
+    throw new Error("No content returned from API");
 
   } catch (error) {
     console.error("AI Generation Error:", error);

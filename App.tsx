@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Upload, Sliders, Download, Image as ImageIcon, Sparkles, Zap, ArrowRight, Loader2, Save, CheckCircle, Key, RefreshCw, Settings as SettingsIcon, Database, Wand2, Layers, Minimize2, Cpu, Play } from 'lucide-react';
+import { Upload, Sliders, Download, Image as ImageIcon, Sparkles, Zap, ArrowRight, Loader2, Save, CheckCircle, Key, RefreshCw, Settings as SettingsIcon, Database, Wand2, Layers, Minimize2, Cpu, Play, PenTool } from 'lucide-react';
 import { ThemeToggle } from './components/ThemeToggle';
 import { ImageComparator } from './components/ImageComparator';
 import { HistoryList } from './components/HistoryList';
@@ -12,6 +12,7 @@ import { compressImage, applyImageEnhancement, formatBytes, blobToDataURL, getCo
 import { analyzeImage, generateEnhancedImage } from './services/geminiService';
 import { ProcessedImage, AppSettings, ProcessMode } from './types';
 import { StorageService } from './services/storageService';
+import { ImageEditorModal } from './components/ImageEditorModal';
 
 // Translation Dictionary
 const translations = {
@@ -115,6 +116,7 @@ const translations = {
         btn_generate: '开始生成',
         generating: '生成中...',
         ai_enhance_placeholder: '等待生成...',
+        responding: '已生成图片',
 
         // Backup & Restore
         backup_tag_label: '备份标签 / 名称',
@@ -232,6 +234,7 @@ const translations = {
         btn_generate: 'Generate',
         generating: 'Generating...',
         ai_enhance_placeholder: 'Waiting for generation...',
+        responding: 'Already Generated',
 
         // Backup & Restore
         backup_tag_label: 'Backup Tag / Name',
@@ -291,6 +294,24 @@ const Typewriter = ({ texts, speed = 100, pause = 2000 }: { texts: string[], spe
     );
 };
 
+const TypewriterText = ({ text }: { text: string }) => {
+    const [displayedText, setDisplayedText] = useState('');
+
+    useEffect(() => {
+        setDisplayedText('');
+        let index = 0;
+        const interval = setInterval(() => {
+            setDisplayedText(text.slice(0, index + 1));
+            index++;
+            if (index >= text.length) clearInterval(interval);
+        }, 30);
+        return () => clearInterval(interval);
+    }, [text]);
+
+    return <div className="whitespace-pre-wrap break-words">{displayedText}</div>;
+};
+
+
 function App() {
     const [isDark, setIsDark] = useState(true);
     const [currentImage, setCurrentImage] = useState<ProcessedImage | null>(null);
@@ -310,6 +331,7 @@ function App() {
     const [currentAiPrompt, setCurrentAiPrompt] = useState('');
     const [isAiGenerating, setIsAiGenerating] = useState(false);
     const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+    const [showImageEditor, setShowImageEditor] = useState(false);
 
     // App Settings
     const [settings, setSettings] = useState<AppSettings>({
@@ -499,7 +521,7 @@ function App() {
 
         setIsAiGenerating(true);
         try {
-            const blob = await generateEnhancedImage(
+            const result = await generateEnhancedImage(
                 currentImage.originalPreview,
                 currentAiPrompt,
                 settings.aiModel,
@@ -507,18 +529,36 @@ function App() {
                 settings.customBaseUrl
             );
 
-            if (blob) {
-                const compressedPreview = await blobToDataURL(blob);
-                setCurrentImage(prev => prev ? ({
-                    ...prev,
-                    compressedBlob: blob,
-                    compressedPreview,
-                    compressedSize: blob.size,
-                    compressionRatio: 0, // Not applicable
-                    qualityUsed: 1, // Flag as generated
-                    aiModelUsed: settings.aiModel // Save model used
-                }) : null);
-                setHasSaved(false);
+            if (result) {
+                const { blob, text } = result;
+
+                setCurrentImage(prev => {
+                    if (!prev) return null;
+
+                    const updates: Partial<ProcessedImage> = {
+                        aiGeneratedText: text // Save generated text
+                    };
+
+                    if (blob) {
+                        updates.qualityUsed = 1; // Flag as generated
+                        updates.aiModelUsed = settings.aiModel; // Save model used
+                        updates.compressedBlob = blob;
+                        updates.compressedSize = blob.size;
+                        updates.compressionRatio = 0;
+                    }
+
+                    return {
+                        ...prev,
+                        ...updates,
+                    } as ProcessedImage;
+                });
+
+                // We need to handle the async preview update if blob exists
+                if (blob) {
+                    const compressedPreview = await blobToDataURL(blob);
+                    setCurrentImage(prev => prev ? ({ ...prev, compressedPreview }) : null);
+                    setHasSaved(false); // Only mark as unsaved (allow saving to history) if we got a new image
+                }
             }
         } catch (e: any) {
             alert("AI Generation Failed: " + e.message);
@@ -822,6 +862,40 @@ function App() {
                         <div className="lg:w-1/3 space-y-6 order-2 lg:order-1">
 
                             {/* Stats */}
+                            {/* Image Preview & Editor Trigger */}
+                            <div
+                                className="glass-panel rounded-2xl p-2 shadow-xl cursor-pointer group relative overflow-hidden mb-6"
+                                onClick={() => setShowImageEditor(true)}
+                            >
+                                <img
+                                    src={currentImage.originalPreview}
+                                    alt="Original Preview"
+                                    className="w-full h-48 object-cover rounded-xl transition-transform duration-300 group-hover:scale-105"
+                                />
+                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-xl">
+                                    <span className="text-white font-bold flex items-center gap-2">
+                                        <PenTool size={20} /> Edit / View
+                                    </span>
+                                </div>
+                            </div>
+
+                            <ImageEditorModal
+                                isOpen={showImageEditor}
+                                onClose={() => setShowImageEditor(false)}
+                                imageSrc={currentImage.originalPreview}
+                                onSave={async (newImage) => {
+                                    // Update current image with edited version
+                                    // Note: This replaces the "original" in the context of the app
+                                    const res = await fetch(newImage);
+                                    const blob = await res.blob();
+                                    const file = new File([blob], currentImage.originalFile.name, { type: 'image/png' });
+
+                                    // Trigger re-processing with new file
+                                    processFile(file, currentImage.mode);
+                                }}
+                            />
+
+                            {/* Stats */}
                             <div className="glass-panel rounded-2xl p-6 shadow-xl">
                                 <div className="flex justify-between items-start mb-4">
                                     <h3 className="text-lg font-bold text-gray-800 dark:text-white flex items-center gap-2">
@@ -892,6 +966,15 @@ function App() {
                                                 {isAiGenerating ? <Loader2 className="animate-spin" size={18} /> : <Sparkles size={18} />}
                                                 {isAiGenerating ? t('generating') : t('btn_generate')}
                                             </button>
+
+                                            {currentImage?.aiModelUsed && (
+                                                <div className="mt-4 p-3 bg-gray-100 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 text-sm text-gray-700 dark:text-gray-300 max-h-60 overflow-y-auto shadow-inner">
+                                                    <div className="flex items-center gap-2 mb-2 text-xs font-bold text-gray-500 uppercase">
+                                                        <Sparkles size={12} /> AI Response
+                                                    </div>
+                                                    <TypewriterText text={currentImage.aiGeneratedText || t('responding')} />
+                                                </div>
+                                            )}
                                         </div>
                                     ) : (
                                         <>

@@ -39,3 +39,6 @@ lerna-debug.log*
 *.sln
 *.sw?
 .env*.local
+
+test/*
+1/*

@@ -638,7 +638,19 @@ function App() {
 
         // If switching to AI enhance, don't auto-process algo
         if (newMode === 'enhance' && settings.enhanceMethod === 'ai') {
-            setCurrentImage(prev => prev ? ({ ...prev, mode: newMode, enhanceMethod: 'ai' }) : null);
+            setCurrentImage(prev => prev ? ({
+                ...prev,
+                mode: newMode,
+                enhanceMethod: 'ai',
+                // Reset to "pending" state
+                qualityUsed: 0,
+                compressedPreview: prev.originalPreview, // Show original until generated
+                compressedSize: prev.originalSize, // Reset size
+                compressedBlob: prev.originalFile.slice(0, prev.originalFile.size, prev.originalFile.type), // Reset blob
+                compressionRatio: 0,
+                aiGeneratedText: undefined // Clear previous text
+            }) : null);
+            setHasSaved(false);
             return;
         }
 

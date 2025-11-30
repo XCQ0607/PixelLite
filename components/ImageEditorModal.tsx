@@ -66,6 +66,7 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ isOpen, onCl
     const [isDraggingCrop, setIsDraggingCrop] = useState(false);
     const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
     const [cropStart, setCropStart] = useState<CropState | null>(null);
+    const [activeHandle, setActiveHandle] = useState<string | null>(null);
 
     // Initialize
     useEffect(() => {
@@ -211,13 +212,89 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ isOpen, onCl
         setCrop({ x, y, width: w, height: h });
     };
 
+    // Convert screen coordinates to image coordinates
+    const getCropPoint = (e: React.MouseEvent | React.TouchEvent) => {
+        if (!imageRef.current) return null;
+        const img = imageRef.current;
+        const rect = img.getBoundingClientRect(); // This is the displayed image rect
+
+        const clientX = 'touches' in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
+        const clientY = 'touches' in e ? e.touches[0].clientY : (e as React.MouseEvent).clientY;
+
+        // Calculate relative position (0-1)
+        const relX = (clientX - rect.left) / rect.width;
+        const relY = (clientY - rect.top) / rect.height;
+
+        // Map to natural dimensions
+        return {
+            x: relX * img.naturalWidth,
+            y: relY * img.naturalHeight
+        };
+    };
+
+    const startCropDrag = (e: React.MouseEvent | React.TouchEvent, handle: string | null = null) => {
+        if (activeTab !== 'crop' || !crop) return;
+        e.stopPropagation();
+        e.preventDefault();
+
+        const point = getCropPoint(e);
+        if (!point) return;
+
+        setIsDraggingCrop(true);
+        setDragStart(point);
+        setCropStart({ ...crop });
+        setActiveHandle(handle);
+    };
+
+    const onCropDrag = (e: React.MouseEvent | React.TouchEvent) => {
+        if (!isDraggingCrop || !crop || !cropStart || !imageRef.current) return;
+        e.preventDefault();
+
+        const point = getCropPoint(e);
+        if (!point) return;
+
+        const dx = point.x - dragStart.x;
+        const dy = point.y - dragStart.y;
+        const imgW = imageRef.current.naturalWidth;
+        const imgH = imageRef.current.naturalHeight;
+
+        let newCrop = { ...cropStart };
+
+        if (activeHandle === 'move') {
+            newCrop.x = Math.max(0, Math.min(imgW - newCrop.width, cropStart.x + dx));
+            newCrop.y = Math.max(0, Math.min(imgH - newCrop.height, cropStart.y + dy));
+        } else if (activeHandle) {
+            // Resize logic
+            if (activeHandle.includes('n')) {
+                const maxY = cropStart.y + cropStart.height;
+                newCrop.y = Math.min(maxY - 10, Math.max(0, cropStart.y + dy));
+                newCrop.height = maxY - newCrop.y;
+            }
+            if (activeHandle.includes('s')) {
+                newCrop.height = Math.min(imgH - cropStart.y, Math.max(10, cropStart.height + dy));
+            }
+            if (activeHandle.includes('w')) {
+                const maxX = cropStart.x + cropStart.width;
+                newCrop.x = Math.min(maxX - 10, Math.max(0, cropStart.x + dx));
+                newCrop.width = maxX - newCrop.x;
+            }
+            if (activeHandle.includes('e')) {
+                newCrop.width = Math.min(imgW - cropStart.x, Math.max(10, cropStart.width + dx));
+            }
+        }
+
+        setCrop(newCrop);
+    };
+
+    const stopCropDrag = () => {
+        setIsDraggingCrop(false);
+        setActiveHandle(null);
+    };
+
     const applyCrop = () => {
-        // Crop is applied during save. Here we just switch back to draw or adjust?
-        // Actually, let's just keep the crop rect visible until save or cancel.
-        // But for UX, maybe "Apply" just means "I'm done adjusting the crop rect".
-        // Since we don't destructively crop until save, we can just leave it.
-        // Or we can update the VIEW to show only the cropped area?
-        // For simplicity, we'll just keep the rect.
+        // Just confirm the crop visually (maybe flash or something?)
+        // For now, we just stay in crop mode but maybe disable the handles?
+        // Or simply switch back to draw mode as "Done"
         setActiveTab('draw');
     };
 
@@ -268,26 +345,9 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ isOpen, onCl
             ctx.scale(flipH ? -1 : 1, flipV ? -1 : 1);
 
             // 5. Draw Image (Cropped)
-            // drawImage(image, sx, sy, sWidth, sHeight, dx, dy, dWidth, dHeight)
-            // We need to draw the cropped area centered in the transformed context
-            // The context is centered at (0,0) relative to the output canvas
-            // So we draw from -width/2 to width/2
-
-            const drawW = isRotated90 ? sourceH : sourceW; // Effective width in local space
-            const drawH = isRotated90 ? sourceW : sourceH; // Effective height in local space
-            // Wait, if we rotate 90deg, the "width" of the image in local space is still sourceW.
-            // But we are drawing into a canvas that is swapped.
-
-            // Let's simplify:
-            // We draw the image centered at 0,0.
-            // The image source rect is (sourceX, sourceY, sourceW, sourceH).
-            // We draw it to (-sourceW/2, -sourceH/2, sourceW, sourceH).
-
             ctx.drawImage(img, sourceX, sourceY, sourceW, sourceH, -sourceW / 2, -sourceH / 2, sourceW, sourceH);
 
             // 6. Draw Annotations (Cropped)
-            // The annotation canvas matches the full natural size.
-            // So we also crop it using the same source rect.
             ctx.filter = 'none'; // Don't filter annotations
             ctx.drawImage(canvasRef.current, sourceX, sourceY, sourceW, sourceH, -sourceW / 2, -sourceH / 2, sourceW, sourceH);
 
@@ -303,7 +363,13 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ isOpen, onCl
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-fade-in">
+        <div
+            className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-fade-in"
+            onMouseMove={activeTab === 'crop' ? onCropDrag : undefined}
+            onMouseUp={activeTab === 'crop' ? stopCropDrag : undefined}
+            onTouchMove={activeTab === 'crop' ? onCropDrag : undefined}
+            onTouchEnd={activeTab === 'crop' ? stopCropDrag : undefined}
+        >
             <div className="bg-gray-900 rounded-2xl shadow-2xl flex flex-col w-full max-w-6xl h-[90vh] overflow-hidden border border-gray-700">
                 {/* Header */}
                 <div className="flex justify-between items-center p-4 border-b border-gray-800 bg-gray-900">
@@ -329,7 +395,7 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ isOpen, onCl
                 {/* Main Workspace */}
                 <div className="flex-1 flex overflow-hidden">
                     {/* Toolbar (Left) - Dynamic based on Tab */}
-                    <div className="w-64 bg-gray-800 border-r border-gray-700 flex flex-col p-4 gap-6 overflow-y-auto">
+                    <div className="w-64 bg-gray-800 border-r border-gray-700 flex flex-col p-4 gap-6 overflow-y-auto z-20">
 
                         {activeTab === 'draw' && (
                             <>
@@ -373,7 +439,7 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ isOpen, onCl
                             <>
                                 <div>
                                     <h4 className="text-xs font-bold text-gray-500 uppercase mb-3 tracking-wider">{t('editor_crop')}</h4>
-                                    <p className="text-xs text-gray-400 mb-4">Drag the overlay to crop.</p>
+                                    <p className="text-xs text-gray-400 mb-4">{t('editor_crop_tip')}</p>
                                     <div className="flex flex-col gap-2">
                                         <button onClick={applyCrop} className="w-full py-2 bg-primary hover:bg-primary/90 text-white rounded-lg flex items-center justify-center gap-2">
                                             <Check size={16} /> {t('editor_apply')}
@@ -479,20 +545,37 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ isOpen, onCl
                                     <div className="absolute inset-0 bg-black/50"></div>
                                     {/* Crop Rect */}
                                     <div
-                                        className="absolute border-2 border-white shadow-[0_0_0_9999px_rgba(0,0,0,0.5)] cursor-move"
+                                        className="absolute border-2 border-white shadow-[0_0_0_9999px_rgba(0,0,0,0.5)] cursor-move touch-none"
                                         style={{
                                             left: (crop.x / (imageRef.current?.naturalWidth || 1)) * 100 + '%',
                                             top: (crop.y / (imageRef.current?.naturalHeight || 1)) * 100 + '%',
                                             width: (crop.width / (imageRef.current?.naturalWidth || 1)) * 100 + '%',
                                             height: (crop.height / (imageRef.current?.naturalHeight || 1)) * 100 + '%'
                                         }}
-                                    // Simple drag implementation for demo purposes
-                                    // In a real app, use a library like react-easy-crop or implement full drag/resize logic
+                                        onMouseDown={(e) => startCropDrag(e, 'move')}
+                                        onTouchStart={(e) => startCropDrag(e, 'move')}
                                     >
-                                        <div className="absolute -top-1 -left-1 w-3 h-3 bg-white border border-gray-400"></div>
-                                        <div className="absolute -top-1 -right-1 w-3 h-3 bg-white border border-gray-400"></div>
-                                        <div className="absolute -bottom-1 -left-1 w-3 h-3 bg-white border border-gray-400"></div>
-                                        <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-white border border-gray-400"></div>
+                                        {/* Handles */}
+                                        <div
+                                            className="absolute -top-2 -left-2 w-4 h-4 bg-white border border-gray-400 cursor-nw-resize"
+                                            onMouseDown={(e) => startCropDrag(e, 'nw')}
+                                            onTouchStart={(e) => startCropDrag(e, 'nw')}
+                                        ></div>
+                                        <div
+                                            className="absolute -top-2 -right-2 w-4 h-4 bg-white border border-gray-400 cursor-ne-resize"
+                                            onMouseDown={(e) => startCropDrag(e, 'ne')}
+                                            onTouchStart={(e) => startCropDrag(e, 'ne')}
+                                        ></div>
+                                        <div
+                                            className="absolute -bottom-2 -left-2 w-4 h-4 bg-white border border-gray-400 cursor-sw-resize"
+                                            onMouseDown={(e) => startCropDrag(e, 'sw')}
+                                            onTouchStart={(e) => startCropDrag(e, 'sw')}
+                                        ></div>
+                                        <div
+                                            className="absolute -bottom-2 -right-2 w-4 h-4 bg-white border border-gray-400 cursor-se-resize"
+                                            onMouseDown={(e) => startCropDrag(e, 'se')}
+                                            onTouchStart={(e) => startCropDrag(e, 'se')}
+                                        ></div>
                                     </div>
                                 </div>
                             )}

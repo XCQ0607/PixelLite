@@ -39,9 +39,11 @@ const DEFAULT_FILTERS: FilterState = {
 };
 
 export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ isOpen, onClose, imageSrc, onSave, t }) => {
-    const containerRef = useRef<HTMLDivElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null); // Drawing layer
     const imageRef = useRef<HTMLImageElement>(null); // Base image
+
+    // Internal state for the image being edited (allows destructive edits like crop)
+    const [currentSrc, setCurrentSrc] = useState(imageSrc);
 
     const [activeTab, setActiveTab] = useState<EditorTab>('draw');
 
@@ -68,21 +70,31 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ isOpen, onCl
     const [cropStart, setCropStart] = useState<CropState | null>(null);
     const [activeHandle, setActiveHandle] = useState<string | null>(null);
 
-    // Initialize
+    // Reset when opening new image
+    useEffect(() => {
+        if (isOpen) {
+            setCurrentSrc(imageSrc);
+            resetState();
+        }
+    }, [isOpen, imageSrc]);
+
+    const resetState = () => {
+        setRotation(0);
+        setFlipH(false);
+        setFlipV(false);
+        setHistory([]);
+        setHistoryStep(-1);
+        setFilters(DEFAULT_FILTERS);
+        setCrop(null);
+        setActiveTab('draw');
+        // Canvas clear is handled in initCanvas
+    };
+
+    // Initialize Canvas when image loads
     useEffect(() => {
         if (isOpen && imageRef.current && canvasRef.current) {
             const img = imageRef.current;
             const canvas = canvasRef.current;
-
-            // Reset all state
-            setRotation(0);
-            setFlipH(false);
-            setFlipV(false);
-            setHistory([]);
-            setHistoryStep(-1);
-            setFilters(DEFAULT_FILTERS);
-            setCrop(null);
-            setActiveTab('draw');
 
             const initCanvas = () => {
                 canvas.width = img.naturalWidth;
@@ -90,7 +102,9 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ isOpen, onCl
                 const ctx = canvas.getContext('2d');
                 if (ctx) {
                     ctx.clearRect(0, 0, canvas.width, canvas.height);
-                    saveHistory();
+                    // If we have history, we might want to restore it? 
+                    // But if currentSrc changed (e.g. crop), history is invalid.
+                    // So we only clear.
                 }
             };
 
@@ -100,7 +114,83 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ isOpen, onCl
                 img.onload = initCanvas;
             }
         }
-    }, [isOpen, imageSrc]);
+    }, [isOpen, currentSrc]);
+
+    // --- Helper: Flatten/Bake Image ---
+    // Combines Image + Transforms + Filters + Drawing + (Optional) Crop into a new DataURL
+    const flattenImage = (customCrop?: CropState): string | null => {
+        if (!imageRef.current || !canvasRef.current) return null;
+
+        const img = imageRef.current;
+        const tempCanvas = document.createElement('canvas');
+        const ctx = tempCanvas.getContext('2d');
+        if (!ctx) return null;
+
+        // 1. Determine dimensions
+        // If cropping, use crop dims. Else use natural dims.
+        const targetCrop = customCrop || crop;
+
+        let sourceX = 0, sourceY = 0, sourceW = img.naturalWidth, sourceH = img.naturalHeight;
+        if (targetCrop) {
+            sourceX = targetCrop.x;
+            sourceY = targetCrop.y;
+            sourceW = targetCrop.width;
+            sourceH = targetCrop.height;
+        }
+
+        // 2. Handle Rotation for Output Canvas Size
+        // If we are just flattening (no crop), we respect rotation.
+        // If we are cropping, we assume the crop rect is in the *current* coordinate space.
+        // BUT, to simplify, we enforce that cropping only happens on unrotated images (we bake rotation first).
+        // So if customCrop is present, we assume rotation is 0.
+
+        const isRotated90 = rotation % 180 !== 0;
+        tempCanvas.width = isRotated90 ? sourceH : sourceW;
+        tempCanvas.height = isRotated90 ? sourceW : sourceH;
+
+        // 3. Apply Filters
+        ctx.filter = getFilterString();
+
+        // 4. Apply Transforms
+        ctx.save();
+        ctx.translate(tempCanvas.width / 2, tempCanvas.height / 2);
+        ctx.rotate((rotation * Math.PI) / 180);
+        ctx.scale(flipH ? -1 : 1, flipV ? -1 : 1);
+
+        // 5. Draw Image
+        // We draw centered.
+        ctx.drawImage(img, sourceX, sourceY, sourceW, sourceH, -sourceW / 2, -sourceH / 2, sourceW, sourceH);
+
+        // 6. Draw Annotations
+        ctx.filter = 'none';
+        ctx.drawImage(canvasRef.current, sourceX, sourceY, sourceW, sourceH, -sourceW / 2, -sourceH / 2, sourceW, sourceH);
+
+        ctx.restore();
+
+        return tempCanvas.toDataURL('image/png');
+    };
+
+    // --- Tab Switching Logic ---
+    const handleTabChange = (tab: EditorTab) => {
+        if (tab === 'crop') {
+            // If we have transforms, bake them first so cropping coordinates are simple
+            if (rotation !== 0 || flipH || flipV) {
+                const baked = flattenImage();
+                if (baked) {
+                    setCurrentSrc(baked);
+                    setRotation(0);
+                    setFlipH(false);
+                    setFlipV(false);
+                    setHistory([]); // History is now part of the image
+                    setHistoryStep(-1);
+                    // Filters are also baked in? Yes, getFilterString() is used in flattenImage.
+                    setFilters(DEFAULT_FILTERS);
+                }
+            }
+            if (!crop) initCrop();
+        }
+        setActiveTab(tab);
+    };
 
     // --- Drawing Logic ---
     const saveHistory = () => {
@@ -212,20 +302,17 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ isOpen, onCl
         setCrop({ x, y, width: w, height: h });
     };
 
-    // Convert screen coordinates to image coordinates
     const getCropPoint = (e: React.MouseEvent | React.TouchEvent) => {
         if (!imageRef.current) return null;
         const img = imageRef.current;
-        const rect = img.getBoundingClientRect(); // This is the displayed image rect
+        const rect = img.getBoundingClientRect();
 
         const clientX = 'touches' in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
         const clientY = 'touches' in e ? e.touches[0].clientY : (e as React.MouseEvent).clientY;
 
-        // Calculate relative position (0-1)
         const relX = (clientX - rect.left) / rect.width;
         const relY = (clientY - rect.top) / rect.height;
 
-        // Map to natural dimensions
         return {
             x: relX * img.naturalWidth,
             y: relY * img.naturalHeight
@@ -264,7 +351,6 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ isOpen, onCl
             newCrop.x = Math.max(0, Math.min(imgW - newCrop.width, cropStart.x + dx));
             newCrop.y = Math.max(0, Math.min(imgH - newCrop.height, cropStart.y + dy));
         } else if (activeHandle) {
-            // Resize logic
             if (activeHandle.includes('n')) {
                 const maxY = cropStart.y + cropStart.height;
                 newCrop.y = Math.min(maxY - 10, Math.max(0, cropStart.y + dy));
@@ -292,10 +378,21 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ isOpen, onCl
     };
 
     const applyCrop = () => {
-        // Just confirm the crop visually (maybe flash or something?)
-        // For now, we just stay in crop mode but maybe disable the handles?
-        // Or simply switch back to draw mode as "Done"
-        setActiveTab('draw');
+        if (!crop) return;
+        // Bake the crop into the image
+        const baked = flattenImage(crop);
+        if (baked) {
+            setCurrentSrc(baked);
+            setCrop(null);
+            // Reset filters/transforms as they are now baked
+            setFilters(DEFAULT_FILTERS);
+            setRotation(0);
+            setFlipH(false);
+            setFlipV(false);
+            setHistory([]);
+            setHistoryStep(-1);
+            setActiveTab('draw');
+        }
     };
 
     const cancelCrop = () => {
@@ -314,48 +411,9 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ isOpen, onCl
 
     // --- Save Logic ---
     const handleSave = () => {
-        if (!imageRef.current || !canvasRef.current) return;
-
-        const img = imageRef.current;
-        const tempCanvas = document.createElement('canvas');
-        const ctx = tempCanvas.getContext('2d');
-
-        // 1. Determine dimensions (Crop or Full)
-        let sourceX = 0, sourceY = 0, sourceW = img.naturalWidth, sourceH = img.naturalHeight;
-        if (crop) {
-            sourceX = crop.x;
-            sourceY = crop.y;
-            sourceW = crop.width;
-            sourceH = crop.height;
-        }
-
-        // 2. Handle Rotation for Output Canvas Size
-        const isRotated90 = rotation % 180 !== 0;
-        tempCanvas.width = isRotated90 ? sourceH : sourceW;
-        tempCanvas.height = isRotated90 ? sourceW : sourceH;
-
-        if (ctx) {
-            // 3. Apply Filters
-            ctx.filter = getFilterString();
-
-            // 4. Apply Transforms
-            ctx.save();
-            ctx.translate(tempCanvas.width / 2, tempCanvas.height / 2);
-            ctx.rotate((rotation * Math.PI) / 180);
-            ctx.scale(flipH ? -1 : 1, flipV ? -1 : 1);
-
-            // 5. Draw Image (Cropped)
-            ctx.drawImage(img, sourceX, sourceY, sourceW, sourceH, -sourceW / 2, -sourceH / 2, sourceW, sourceH);
-
-            // 6. Draw Annotations (Cropped)
-            ctx.filter = 'none'; // Don't filter annotations
-            ctx.drawImage(canvasRef.current, sourceX, sourceY, sourceW, sourceH, -sourceW / 2, -sourceH / 2, sourceW, sourceH);
-
-            ctx.restore();
-
-            // 7. Export
-            const newImage = tempCanvas.toDataURL('image/png');
-            onSave(newImage);
+        const result = flattenImage();
+        if (result) {
+            onSave(result);
             onClose();
         }
     };
@@ -379,9 +437,9 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ isOpen, onCl
                         </h3>
                         {/* Tabs */}
                         <div className="flex bg-gray-800 rounded-lg p-1">
-                            <button onClick={() => setActiveTab('draw')} className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${activeTab === 'draw' ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-white'}`}>{t('editor_draw')}</button>
-                            <button onClick={() => { setActiveTab('crop'); if (!crop) initCrop(); }} className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${activeTab === 'crop' ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-white'}`}>{t('editor_crop')}</button>
-                            <button onClick={() => setActiveTab('adjust')} className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${activeTab === 'adjust' ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-white'}`}>{t('editor_adjust')}</button>
+                            <button onClick={() => handleTabChange('draw')} className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${activeTab === 'draw' ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-white'}`}>{t('editor_draw')}</button>
+                            <button onClick={() => handleTabChange('crop')} className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${activeTab === 'crop' ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-white'}`}>{t('editor_crop')}</button>
+                            <button onClick={() => handleTabChange('adjust')} className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${activeTab === 'adjust' ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-white'}`}>{t('editor_adjust')}</button>
                         </div>
                     </div>
                     <div className="flex gap-2">
@@ -394,9 +452,8 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ isOpen, onCl
 
                 {/* Main Workspace */}
                 <div className="flex-1 flex overflow-hidden">
-                    {/* Toolbar (Left) - Dynamic based on Tab */}
+                    {/* Toolbar (Left) */}
                     <div className="w-64 bg-gray-800 border-r border-gray-700 flex flex-col p-4 gap-6 overflow-y-auto z-20">
-
                         {activeTab === 'draw' && (
                             <>
                                 <div>
@@ -414,23 +471,11 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ isOpen, onCl
                                 </div>
                                 <div>
                                     <h4 className="text-xs font-bold text-gray-500 uppercase mb-3 tracking-wider">{t('editor_color')}</h4>
-                                    <input
-                                        type="color"
-                                        value={color}
-                                        onChange={(e) => { setColor(e.target.value); setTool('pen'); }}
-                                        className="w-full h-10 rounded-lg cursor-pointer border-2 border-gray-600 p-0 overflow-hidden"
-                                    />
+                                    <input type="color" value={color} onChange={(e) => { setColor(e.target.value); setTool('pen'); }} className="w-full h-10 rounded-lg cursor-pointer border-2 border-gray-600 p-0 overflow-hidden" />
                                 </div>
                                 <div>
                                     <h4 className="text-xs font-bold text-gray-500 uppercase mb-3 tracking-wider">{t('editor_size')} ({lineWidth}px)</h4>
-                                    <input
-                                        type="range"
-                                        min="1"
-                                        max="50"
-                                        value={lineWidth}
-                                        onChange={(e) => setLineWidth(parseInt(e.target.value))}
-                                        className="w-full"
-                                    />
+                                    <input type="range" min="1" max="50" value={lineWidth} onChange={(e) => setLineWidth(parseInt(e.target.value))} className="w-full" />
                                 </div>
                             </>
                         )}
@@ -522,7 +567,7 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ isOpen, onCl
                         >
                             <img
                                 ref={imageRef}
-                                src={imageSrc}
+                                src={currentSrc}
                                 alt="Editing"
                                 className="max-w-full max-h-[80vh] object-contain block select-none pointer-events-none"
                                 draggable={false}
@@ -585,15 +630,8 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ isOpen, onCl
                     {/* Right Panel (Actions) */}
                     <div className="w-20 bg-gray-800 border-l border-gray-700 flex flex-col items-center py-4 gap-4">
                         <button onClick={() => {
-                            setRotation(0);
-                            setFlipH(false);
-                            setFlipV(false);
-                            setHistory([]);
-                            setHistoryStep(-1);
-                            setFilters(DEFAULT_FILTERS);
-                            setCrop(null);
-                            const ctx = canvasRef.current?.getContext('2d');
-                            if (ctx && canvasRef.current) ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+                            setCurrentSrc(imageSrc);
+                            resetState();
                         }} className="p-3 text-gray-400 hover:text-white hover:bg-gray-700 rounded-xl transition-colors" title={t('editor_reset')}>
                             <RefreshCw size={24} />
                         </button>

@@ -146,6 +146,10 @@ export interface TranslationKeys {
     fetching_backups: string;
     no_backups_found: string;
     confirm_restore_backup: string;
+    confirm_restore_settings: string;
+    btn_restore_images: string;
+    btn_restore_settings: string;
+    btn_restore_all: string;
     restored_items_count: string;
     restore_backup_failed: string;
     confirm_batch_delete_backups: string;
@@ -218,7 +222,7 @@ export const translations: Record<Language, TranslationKeys> = {
         confirm_delete_title: '确认删除?',
         confirm_delete_desc: '您即将删除 {count} 个项目。此操作无法撤销。',
         cancel: '取消',
-        confirm: '确认删除',
+        confirm: '确认',
         no_history: '暂无历史记录',
         generate_ai: 'AI 分析',
         original_label: '原图',
@@ -334,6 +338,10 @@ export const translations: Record<Language, TranslationKeys> = {
         fetching_backups: '获取备份列表中...',
         no_backups_found: '未找到备份文件',
         confirm_restore_backup: '确认从 {filename} 恢复？',
+        confirm_restore_settings: '检测到备份包含设置信息，请选择恢复方式：',
+        btn_restore_images: '仅恢复图片',
+        btn_restore_settings: '仅恢复设置',
+        btn_restore_all: '恢复所有',
         restored_items_count: '成功恢复 {count} 个项目',
         restore_backup_failed: '恢复失败',
         confirm_batch_delete_backups: '确认删除 {count} 个备份？',
@@ -501,6 +509,10 @@ export const translations: Record<Language, TranslationKeys> = {
         fetching_backups: 'Fetching backups...',
         no_backups_found: 'No backups found',
         confirm_restore_backup: 'Restore from {filename}?',
+        confirm_restore_settings: 'Backup contains settings. Choose restore mode:',
+        btn_restore_images: 'Images Only',
+        btn_restore_settings: 'Settings Only',
+        btn_restore_all: 'Restore All',
         restored_items_count: 'Restored {count} items',
         restore_backup_failed: 'Restore failed',
         confirm_batch_delete_backups: 'Delete {count} backups?',

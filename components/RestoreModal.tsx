@@ -28,6 +28,12 @@ export const RestoreModal: React.FC<RestoreModalProps> = ({ isOpen, onClose, con
         type: 'confirm' | 'alert' | 'info';
         confirmText?: string;
         onConfirm: () => void;
+        onCancel?: () => void;
+        customActions?: {
+            label: string;
+            onClick: () => void;
+            variant?: 'primary' | 'secondary' | 'danger' | 'outline';
+        }[];
     }>({
         isOpen: false,
         title: '',
@@ -85,23 +91,91 @@ export const RestoreModal: React.FC<RestoreModalProps> = ({ isOpen, onClose, con
                     console.log('[RestoreModal] Restore result:', result);
                     console.log('[RestoreModal] Restored images count:', result.images.length);
 
-                    onRestore(result);
+                    // Function to finalize restore
+                    const finalizeRestore = (shouldRestoreSettings: boolean) => {
+                        onRestore({
+                            images: result.images,
+                            settings: shouldRestoreSettings ? result.settings : undefined
+                        });
 
-                    // Show success message
-                    const successMsg = t('restored_items_count').replace('{count}', result.images.length.toString());
-                    setDialogConfig({
-                        isOpen: true,
-                        title: t('restore_success'),
-                        message: successMsg,
-                        type: 'info',
-                        confirmText: t('confirm'),
-                        onConfirm: () => {
-                            setDialogConfig(prev => ({ ...prev, isOpen: false }));
-                            onClose();
-                        }
-                    });
+                        // Show success message
+                        const successMsg = t('restored_items_count').replace('{count}', result.images.length.toString());
+                        setDialogConfig({
+                            isOpen: true,
+                            title: t('restore_success'),
+                            message: successMsg,
+                            type: 'info',
+                            confirmText: t('confirm'),
+                            onConfirm: () => {
+                                setDialogConfig(prev => ({ ...prev, isOpen: false }));
+                                onClose();
+                            }
+                        });
+                    };
+
+                    // Check if settings exist in backup
+                    if (result.settings) {
+                        setIsRestoring(false); // Temporarily stop loading to show dialog
+                        setDialogConfig({
+                            isOpen: true,
+                            title: t('restore_modal_title'),
+                            message: t('confirm_restore_settings'),
+                            type: 'confirm',
+                            customActions: [
+                                {
+                                    label: t('btn_restore_all'),
+                                    variant: 'primary',
+                                    onClick: () => {
+                                        setDialogConfig(prev => ({ ...prev, isOpen: false }));
+                                        finalizeRestore(true);
+                                    }
+                                },
+                                {
+                                    label: t('btn_restore_images'),
+                                    variant: 'secondary',
+                                    onClick: () => {
+                                        setDialogConfig(prev => ({ ...prev, isOpen: false }));
+                                        finalizeRestore(false);
+                                    }
+                                },
+                                {
+                                    label: t('btn_restore_settings'),
+                                    variant: 'outline',
+                                    onClick: () => {
+                                        setDialogConfig(prev => ({ ...prev, isOpen: false }));
+                                        // Restore settings only
+                                        onRestore({
+                                            images: [],
+                                            settings: result.settings
+                                        });
+                                        setDialogConfig({
+                                            isOpen: true,
+                                            title: t('restore_success'),
+                                            message: t('restore_success'),
+                                            type: 'info',
+                                            confirmText: t('confirm'),
+                                            onConfirm: () => {
+                                                setDialogConfig(prev => ({ ...prev, isOpen: false }));
+                                                onClose();
+                                            }
+                                        });
+                                    }
+                                }
+                            ],
+                            onConfirm: () => { }, // Not used
+                            onCancel: () => {
+                                setDialogConfig(prev => ({ ...prev, isOpen: false }));
+                                // Do nothing on cancel
+                            }
+                        });
+                    } else {
+                        finalizeRestore(false);
+                        setIsRestoring(false);
+                    }
+
                 } catch (e: any) {
                     console.error('[RestoreModal] Restore error:', e);
+                    setIsRestoring(false);
                     setDialogConfig({
                         isOpen: true,
                         title: t('restore_backup_failed'),
@@ -110,8 +184,6 @@ export const RestoreModal: React.FC<RestoreModalProps> = ({ isOpen, onClose, con
                         confirmText: t('confirm'),
                         onConfirm: () => setDialogConfig(prev => ({ ...prev, isOpen: false }))
                     });
-                } finally {
-                    setIsRestoring(false);
                 }
             }
         });
@@ -335,7 +407,14 @@ export const RestoreModal: React.FC<RestoreModalProps> = ({ isOpen, onClose, con
                 confirmText={dialogConfig.confirmText}
                 cancelText={t('cancel')}
                 onConfirm={dialogConfig.onConfirm}
-                onCancel={() => setDialogConfig(prev => ({ ...prev, isOpen: false }))}
+                onCancel={() => {
+                    if (dialogConfig.onCancel) {
+                        dialogConfig.onCancel();
+                    } else {
+                        setDialogConfig(prev => ({ ...prev, isOpen: false }));
+                    }
+                }}
+                customActions={dialogConfig.customActions}
             />
         </>
     );

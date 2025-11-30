@@ -571,7 +571,7 @@ function App() {
                         return [...itemsToAdd, ...prev];
                     });
 
-                    if (newSettings && confirm("Found settings in backup. Restore them?")) {
+                    if (newSettings) {
                         setSettings(newSettings);
                     }
                 }}

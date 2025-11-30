@@ -430,16 +430,16 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ isOpen, onCl
         >
             <div className="bg-gray-900 rounded-2xl shadow-2xl flex flex-col w-full max-w-6xl h-[90vh] overflow-hidden border border-gray-700">
                 {/* Header */}
-                <div className="flex justify-between items-center p-4 border-b border-gray-800 bg-gray-900">
+                <div className="flex justify-between items-center p-4 border-b border-gray-800 bg-gray-900 shrink-0">
                     <div className="flex items-center gap-4">
                         <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                            <PenTool size={20} className="text-primary" /> {t('editor_title')}
+                            <PenTool size={20} className="text-primary" /> <span className="hidden sm:inline">{t('editor_title')}</span>
                         </h3>
                         {/* Tabs */}
                         <div className="flex bg-gray-800 rounded-lg p-1">
-                            <button onClick={() => handleTabChange('draw')} className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${activeTab === 'draw' ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-white'}`}>{t('editor_draw')}</button>
-                            <button onClick={() => handleTabChange('crop')} className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${activeTab === 'crop' ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-white'}`}>{t('editor_crop')}</button>
-                            <button onClick={() => handleTabChange('adjust')} className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${activeTab === 'adjust' ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-white'}`}>{t('editor_adjust')}</button>
+                            <button onClick={() => handleTabChange('draw')} className={`px-2 sm:px-3 py-1 rounded-md text-xs sm:text-sm font-medium transition-colors ${activeTab === 'draw' ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-white'}`}>{t('editor_draw')}</button>
+                            <button onClick={() => handleTabChange('crop')} className={`px-2 sm:px-3 py-1 rounded-md text-xs sm:text-sm font-medium transition-colors ${activeTab === 'crop' ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-white'}`}>{t('editor_crop')}</button>
+                            <button onClick={() => handleTabChange('adjust')} className={`px-2 sm:px-3 py-1 rounded-md text-xs sm:text-sm font-medium transition-colors ${activeTab === 'adjust' ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-white'}`}>{t('editor_adjust')}</button>
                         </div>
                     </div>
                     <div className="flex gap-2">
@@ -451,12 +451,12 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ isOpen, onCl
                 </div>
 
                 {/* Main Workspace */}
-                <div className="flex-1 flex overflow-hidden">
-                    {/* Toolbar (Left) */}
-                    <div className="w-64 bg-gray-800 border-r border-gray-700 flex flex-col p-4 gap-6 overflow-y-auto z-20">
+                <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
+                    {/* Toolbar (Left on Desktop, Bottom on Mobile) */}
+                    <div className="order-2 lg:order-1 w-full lg:w-64 bg-gray-800 border-t lg:border-t-0 lg:border-r border-gray-700 flex flex-row lg:flex-col p-4 gap-4 lg:gap-6 overflow-x-auto lg:overflow-y-auto z-20 shrink-0 h-auto max-h-[30vh] lg:h-full lg:max-h-none">
                         {activeTab === 'draw' && (
                             <>
-                                <div>
+                                <div className="min-w-[120px] lg:min-w-0">
                                     <h4 className="text-xs font-bold text-gray-500 uppercase mb-3 tracking-wider">{t('editor_draw')}</h4>
                                     <div className="grid grid-cols-2 gap-2">
                                         <button onClick={() => setTool('pen')} className={`p-3 rounded-xl flex flex-col items-center gap-1 transition-all ${tool === 'pen' ? 'bg-primary text-white shadow-lg shadow-primary/30' : 'bg-gray-700 text-gray-400 hover:bg-gray-600 hover:text-white'}`}>
@@ -469,11 +469,11 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ isOpen, onCl
                                         </button>
                                     </div>
                                 </div>
-                                <div>
+                                <div className="min-w-[120px] lg:min-w-0">
                                     <h4 className="text-xs font-bold text-gray-500 uppercase mb-3 tracking-wider">{t('editor_color')}</h4>
                                     <input type="color" value={color} onChange={(e) => { setColor(e.target.value); setTool('pen'); }} className="w-full h-10 rounded-lg cursor-pointer border-2 border-gray-600 p-0 overflow-hidden" />
                                 </div>
-                                <div>
+                                <div className="min-w-[120px] lg:min-w-0">
                                     <h4 className="text-xs font-bold text-gray-500 uppercase mb-3 tracking-wider">{t('editor_size')} ({lineWidth}px)</h4>
                                     <input type="range" min="1" max="50" value={lineWidth} onChange={(e) => setLineWidth(parseInt(e.target.value))} className="w-full" />
                                 </div>
@@ -482,14 +482,14 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ isOpen, onCl
 
                         {activeTab === 'crop' && (
                             <>
-                                <div>
+                                <div className="w-full lg:w-auto">
                                     <h4 className="text-xs font-bold text-gray-500 uppercase mb-3 tracking-wider">{t('editor_crop')}</h4>
-                                    <p className="text-xs text-gray-400 mb-4">{t('editor_crop_tip')}</p>
-                                    <div className="flex flex-col gap-2">
-                                        <button onClick={applyCrop} className="w-full py-2 bg-primary hover:bg-primary/90 text-white rounded-lg flex items-center justify-center gap-2">
+                                    <p className="text-xs text-gray-400 mb-4 hidden lg:block">{t('editor_crop_tip')}</p>
+                                    <div className="flex lg:flex-col gap-2">
+                                        <button onClick={applyCrop} className="flex-1 lg:w-full py-2 bg-primary hover:bg-primary/90 text-white rounded-lg flex items-center justify-center gap-2">
                                             <Check size={16} /> {t('editor_apply')}
                                         </button>
-                                        <button onClick={cancelCrop} className="w-full py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg flex items-center justify-center gap-2">
+                                        <button onClick={cancelCrop} className="flex-1 lg:w-full py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg flex items-center justify-center gap-2">
                                             <Ban size={16} /> {t('editor_cancel')}
                                         </button>
                                     </div>
@@ -499,7 +499,7 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ isOpen, onCl
 
                         {activeTab === 'adjust' && (
                             <>
-                                <div>
+                                <div className="min-w-[200px] lg:min-w-0 flex-1">
                                     <h4 className="text-xs font-bold text-gray-500 uppercase mb-3 tracking-wider">{t('editor_adjust')}</h4>
                                     <div className="space-y-4">
                                         <div>
@@ -525,7 +525,7 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ isOpen, onCl
                                         </div>
                                     </div>
                                 </div>
-                                <div>
+                                <div className="min-w-[200px] lg:min-w-0 flex-1">
                                     <h4 className="text-xs font-bold text-gray-500 uppercase mb-3 tracking-wider">Filters</h4>
                                     <div className="grid grid-cols-2 gap-2">
                                         <button onClick={() => applyFilterPreset({})} className="p-2 bg-gray-700 hover:bg-gray-600 rounded text-xs text-white">{t('editor_filter_none')}</button>
@@ -537,15 +537,16 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ isOpen, onCl
                             </>
                         )}
 
-                        <div className="mt-auto pt-4 border-t border-gray-700">
-                            <div>
+                        <div className="lg:mt-auto lg:pt-4 lg:border-t border-gray-700 flex lg:block gap-4 min-w-[200px] lg:min-w-0">
+                            <div className="flex-1">
                                 <h4 className="text-xs font-bold text-gray-500 uppercase mb-3 tracking-wider">{t('editor_rotate_left')} / {t('editor_rotate_right')}</h4>
                                 <div className="grid grid-cols-2 gap-2">
                                     <button onClick={() => setRotation(r => r - 90)} className="p-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-white flex justify-center"><RotateCcw size={16} /></button>
                                     <button onClick={() => setRotation(r => r + 90)} className="p-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-white flex justify-center"><RotateCw size={16} /></button>
                                 </div>
                             </div>
-                            <div className="mt-2">
+                            <div className="lg:mt-2 flex-1">
+                                <h4 className="text-xs font-bold text-gray-500 uppercase mb-3 tracking-wider lg:hidden">Flip</h4>
                                 <div className="grid grid-cols-2 gap-2">
                                     <button onClick={() => setFlipH(f => !f)} className={`p-2 rounded-lg flex justify-center ${flipH ? 'bg-primary text-white' : 'bg-gray-700 text-white'}`}><FlipHorizontal size={16} /></button>
                                     <button onClick={() => setFlipV(f => !f)} className={`p-2 rounded-lg flex justify-center ${flipV ? 'bg-primary text-white' : 'bg-gray-700 text-white'}`}><FlipVertical size={16} /></button>
@@ -555,7 +556,7 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ isOpen, onCl
                     </div>
 
                     {/* Canvas Area */}
-                    <div className="flex-1 bg-[url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAMUlEQVQ4T2NkYGAQYcAP3uCTZhw1gGGYhAGBZIA/nYDCgBDAm9BGDWAAJyRCgLaBCAAgXwixzAS0pgAAAABJRU5ErkJggg==')] bg-repeat flex items-center justify-center overflow-hidden relative p-8">
+                    <div className="order-1 lg:order-2 flex-1 bg-[url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAMUlEQVQ4T2NkYGAQYcAP3uCTZhw1gGGYhAGBZIA/nYDCgBDAm9BGDWAAJyRCgLaBCAAgXwixzAS0pgAAAABJRU5ErkJggg==')] bg-repeat flex items-center justify-center overflow-hidden relative p-4 lg:p-8">
                         <div
                             className="relative shadow-2xl transition-transform duration-300 ease-out"
                             style={{
@@ -569,7 +570,7 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ isOpen, onCl
                                 ref={imageRef}
                                 src={currentSrc}
                                 alt="Editing"
-                                className="max-w-full max-h-[80vh] object-contain block select-none pointer-events-none"
+                                className="max-w-full max-h-[50vh] lg:max-h-[80vh] object-contain block select-none pointer-events-none"
                                 draggable={false}
                             />
                             <canvas
@@ -602,22 +603,22 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ isOpen, onCl
                                     >
                                         {/* Handles */}
                                         <div
-                                            className="absolute -top-2 -left-2 w-4 h-4 bg-white border border-gray-400 cursor-nw-resize"
+                                            className="absolute -top-4 -left-4 w-8 h-8 lg:w-4 lg:h-4 lg:-top-2 lg:-left-2 bg-white border border-gray-400 cursor-nw-resize rounded-full lg:rounded-none"
                                             onMouseDown={(e) => startCropDrag(e, 'nw')}
                                             onTouchStart={(e) => startCropDrag(e, 'nw')}
                                         ></div>
                                         <div
-                                            className="absolute -top-2 -right-2 w-4 h-4 bg-white border border-gray-400 cursor-ne-resize"
+                                            className="absolute -top-4 -right-4 w-8 h-8 lg:w-4 lg:h-4 lg:-top-2 lg:-right-2 bg-white border border-gray-400 cursor-ne-resize rounded-full lg:rounded-none"
                                             onMouseDown={(e) => startCropDrag(e, 'ne')}
                                             onTouchStart={(e) => startCropDrag(e, 'ne')}
                                         ></div>
                                         <div
-                                            className="absolute -bottom-2 -left-2 w-4 h-4 bg-white border border-gray-400 cursor-sw-resize"
+                                            className="absolute -bottom-4 -left-4 w-8 h-8 lg:w-4 lg:h-4 lg:-bottom-2 lg:-left-2 bg-white border border-gray-400 cursor-sw-resize rounded-full lg:rounded-none"
                                             onMouseDown={(e) => startCropDrag(e, 'sw')}
                                             onTouchStart={(e) => startCropDrag(e, 'sw')}
                                         ></div>
                                         <div
-                                            className="absolute -bottom-2 -right-2 w-4 h-4 bg-white border border-gray-400 cursor-se-resize"
+                                            className="absolute -bottom-4 -right-4 w-8 h-8 lg:w-4 lg:h-4 lg:-bottom-2 lg:-right-2 bg-white border border-gray-400 cursor-se-resize rounded-full lg:rounded-none"
                                             onMouseDown={(e) => startCropDrag(e, 'se')}
                                             onTouchStart={(e) => startCropDrag(e, 'se')}
                                         ></div>
@@ -627,17 +628,17 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ isOpen, onCl
                         </div>
                     </div>
 
-                    {/* Right Panel (Actions) */}
-                    <div className="w-20 bg-gray-800 border-l border-gray-700 flex flex-col items-center py-4 gap-4">
+                    {/* Right Panel (Actions) - Bottom on Mobile */}
+                    <div className="order-3 w-full lg:w-20 bg-gray-800 border-t lg:border-t-0 lg:border-l border-gray-700 flex flex-row lg:flex-col items-center justify-between lg:justify-start p-4 gap-4 shrink-0">
                         <button onClick={() => {
                             setCurrentSrc(imageSrc);
                             resetState();
                         }} className="p-3 text-gray-400 hover:text-white hover:bg-gray-700 rounded-xl transition-colors" title={t('editor_reset')}>
                             <RefreshCw size={24} />
                         </button>
-                        <div className="mt-auto">
-                            <button onClick={handleSave} className="p-3 bg-green-600 hover:bg-green-500 text-white rounded-xl shadow-lg shadow-green-900/20 transition-all hover:scale-105 active:scale-95" title={t('editor_save')}>
-                                <Save size={24} />
+                        <div className="lg:mt-auto">
+                            <button onClick={handleSave} className="px-6 py-3 lg:p-3 bg-green-600 hover:bg-green-500 text-white rounded-xl shadow-lg shadow-green-900/20 transition-all hover:scale-105 active:scale-95 flex items-center gap-2" title={t('editor_save')}>
+                                <Save size={24} /> <span className="lg:hidden font-bold">{t('editor_save')}</span>
                             </button>
                         </div>
                     </div>

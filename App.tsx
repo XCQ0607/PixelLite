@@ -8,7 +8,7 @@ import { SettingsModal } from './components/SettingsModal';
 import { DataManager } from './components/DataManager';
 import { AIResultCard } from './components/AIResultCard';
 import { RestoreModal } from './components/RestoreModal';
-import { compressImage, applyImageEnhancement, formatBytes, blobToDataURL, getCompressedFileName } from './services/imageService';
+import { compressImage, applyImageEnhancement, formatBytes, blobToDataURL, getCompressedFileName, convertBlobFormat } from './services/imageService';
 import { analyzeImage, generateEnhancedImage } from './services/geminiService';
 import { ProcessedImage, AppSettings, ProcessMode } from './types';
 import { StorageService } from './services/storageService';
@@ -106,19 +106,23 @@ function App() {
 
     // App Settings
     const [settings, setSettings] = useState<AppSettings>({
-        customApiKey: '',
-        customBaseUrl: '',
-        defaultQuality: 0.8,
-        smartCompression: true,
-        compressionMode: 'algorithm', // 默认使用专业模式
-        outputFormat: 'original', // 默认保持原格式
-        defaultProcessMode: 'compress',
-        enhanceMethod: 'algorithm',
-        aiModel: 'gemini-2.5-flash-image',
-        analysisModel: 'gemini-2.5-flash',
-        aiPrompt: 'Enhance the clarity and details of this image, maintain realistic colors.',
-        language: 'zh',
-        webdav: { url: '', username: '', password: '' }
+        customApiKey: process.env.CUSTOM_API_KEY || '',
+        customBaseUrl: process.env.CUSTOM_BASE_URL || '',
+        defaultQuality: parseFloat(process.env.DEFAULT_QUALITY || '0.8'),
+        smartCompression: process.env.SMART_COMPRESSION === 'false' ? false : true,
+        compressionMode: (process.env.COMPRESSION_MODE as any) || 'algorithm', // 默认使用专业模式
+        outputFormat: (process.env.OUTPUT_FORMAT as any) || 'original', // 默认保持原格式
+        defaultProcessMode: (process.env.DEFAULT_PROCESS_MODE as any) || 'compress',
+        enhanceMethod: (process.env.ENHANCE_METHOD as any) || 'algorithm',
+        aiModel: process.env.AI_MODEL || 'gemini-2.5-flash-image',
+        analysisModel: process.env.ANALYSIS_MODEL || 'gemini-2.5-flash',
+        aiPrompt: process.env.AI_PROMPT || 'Enhance the clarity and details of this image, maintain realistic colors.',
+        language: (process.env.LANGUAGE as any) || 'zh',
+        webdav: {
+            url: process.env.WEBDAV_URL || '',
+            username: process.env.WEBDAV_USERNAME || '',
+            password: process.env.WEBDAV_PASSWORD || ''
+        }
     });
 
     // Load Settings & History on Mount

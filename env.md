@@ -24,6 +24,15 @@ The following environment variables can be set in your deployment environment (e
 | `WEBDAV_USERNAME` | The username for WebDAV authentication. | `''` (Empty) |
 | `WEBDAV_PASSWORD` | The password for WebDAV authentication. | `''` (Empty) |
 
+## Backend Environment Variables
+
+These variables are used by the serverless functions (`api/`) and are not exposed to the frontend.
+
+| Variable | Description | Default Value |
+| :--- | :--- | :--- |
+| `GEMINI_API_KEY` | The API Key used by the backend proxy. | `''` (Empty) |
+| `GEMINI_BASE_URL` | The Base URL used by the backend proxy. | `''` (Empty) |
+
 ## Usage
 
 Set these variables in your environment. For example, in Vercel:

@@ -1,6 +1,13 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import './index.css';
+
+// Polyfill process for browser environment if not defined (fixes local dev crash)
+if (typeof window !== 'undefined' && !window.process) {
+  // @ts-ignore
+  window.process = { env: {} };
+}
+
 import App from './App';
 
 const rootElement = document.getElementById('root');

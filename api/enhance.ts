@@ -9,8 +9,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const { image, prompt, apiKey, model = 'gemini-2.5-flash-image', baseUrl } = req.body;
 
-    // Use provided API key or fallback to environment variable
-    const key = apiKey || process.env.GEMINI_API_KEY;
+    // Logic:
+    // 1. If user provides apiKey: Use user's apiKey. Use user's baseUrl if provided, otherwise default (undefined). Ignore env vars.
+    // 2. If user provides NO apiKey: Use env GEMINI_API_KEY and env GEMINI_BASE_URL.
+
+    let key: string | undefined;
+    let apiBaseUrl: string | undefined;
+
+    if (apiKey) {
+        key = apiKey;
+        apiBaseUrl = baseUrl; // Use provided baseUrl or undefined (default)
+    } else {
+        key = process.env.GEMINI_API_KEY;
+        apiBaseUrl = process.env.GEMINI_BASE_URL;
+    }
 
     if (!key) {
         return res.status(401).json({ error: 'API Key is required' });
@@ -18,8 +30,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     try {
         const options: any = { apiKey: key };
-        if (baseUrl) {
-            options.httpOptions = { baseUrl: baseUrl };
+        if (apiBaseUrl) {
+            options.httpOptions = { baseUrl: apiBaseUrl };
         }
         const ai = new GoogleGenAI(options);
         const cleanBase64 = image.split(',')[1] || image;

@@ -187,8 +187,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                                     type="text"
                                     value={localSettings.customBaseUrl}
                                     onChange={(e) => setLocalSettings({ ...localSettings, customBaseUrl: e.target.value })}
-                                    placeholder="https://generativelanguage.googleapis.com"
-                                    className="w-full p-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-dark text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all"
+                                    placeholder={!localSettings.customApiKey ? "Please enter API Key first" : "https://generativelanguage.googleapis.com"}
+                                    disabled={!localSettings.customApiKey}
+                                    className="w-full p-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-dark text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                                 />
                             </div>
 
@@ -254,8 +255,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                                             type="button"
                                             onClick={() => setLocalSettings({ ...localSettings, compressionMode: 'canvas' })}
                                             className={`p-3 rounded-lg border text-left transition-all ${localSettings.compressionMode === 'canvas'
-                                                    ? 'bg-primary/10 border-primary text-primary dark:bg-primary/20'
-                                                    : 'bg-white dark:bg-dark border-gray-200 dark:border-gray-700 hover:border-gray-300'
+                                                ? 'bg-primary/10 border-primary text-primary dark:bg-primary/20'
+                                                : 'bg-white dark:bg-dark border-gray-200 dark:border-gray-700 hover:border-gray-300'
                                                 }`}
                                         >
                                             <div className="font-bold text-sm mb-1">{t('engine_canvas')}</div>
@@ -265,8 +266,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                                             type="button"
                                             onClick={() => setLocalSettings({ ...localSettings, compressionMode: 'algorithm' })}
                                             className={`p-3 rounded-lg border text-left transition-all ${localSettings.compressionMode === 'algorithm'
-                                                    ? 'bg-primary/10 border-primary text-primary dark:bg-primary/20'
-                                                    : 'bg-white dark:bg-dark border-gray-200 dark:border-gray-700 hover:border-gray-300'
+                                                ? 'bg-primary/10 border-primary text-primary dark:bg-primary/20'
+                                                : 'bg-white dark:bg-dark border-gray-200 dark:border-gray-700 hover:border-gray-300'
                                                 }`}
                                         >
                                             <div className="font-bold text-sm mb-1">{t('engine_algorithm')}</div>

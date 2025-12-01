@@ -52,7 +52,7 @@ export interface TranslationKeys {
     original_label: string;
     compressed_label: string;
     custom_key_active: string;
-    close_menu: string;
+    delete_record: string;
     export_failed: string;
     tags_label: string;
     drag_compare: string;
@@ -228,7 +228,7 @@ export const translations: Record<Language, TranslationKeys> = {
         original_label: '原图',
         compressed_label: '处理后',
         custom_key_active: 'Custom Key Active',
-        close_menu: '关闭菜单',
+        delete_record: '删除记录',
         export_failed: '导出失败，请重试',
         tags_label: '标签',
         drag_compare: '拖动中间滑块对比效果',
@@ -399,7 +399,7 @@ export const translations: Record<Language, TranslationKeys> = {
         original_label: 'Original',
         compressed_label: 'Processed',
         custom_key_active: 'Custom Key Active',
-        close_menu: 'Close Menu',
+        delete_record: 'Delete Record',
         export_failed: 'Export failed, please try again',
         tags_label: 'Tags',
         drag_compare: 'Drag slider to compare',

@@ -18,6 +18,7 @@ import { useDynamicTitle } from './hooks/useDynamicTitle';
 import { InteractiveOverlay } from './components/InteractiveOverlay';
 import { CustomContextMenu } from './components/CustomContextMenu';
 import { PWAInstallButton } from './components/PWAInstallButton';
+import { ConfirmDialog } from './components/ConfirmDialog';
 
 
 
@@ -103,6 +104,8 @@ function App() {
     const [isAiGenerating, setIsAiGenerating] = useState(false);
     const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
     const [showImageEditor, setShowImageEditor] = useState(false);
+    const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+    const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
 
     // App Settings
     const [settings, setSettings] = useState<AppSettings>({
@@ -646,6 +649,31 @@ function App() {
                 }}
             />
 
+            <ConfirmDialog
+                isOpen={deleteConfirmOpen}
+                title={t('confirm_delete_title')}
+                message={t('confirm_delete_desc').replace('{count}', '1')}
+                type="confirm"
+                confirmText={t('delete')}
+                cancelText={t('cancel')}
+                onConfirm={() => {
+                    if (deleteTargetId) {
+                        setHistory(prev => prev.filter(p => p.id !== deleteTargetId));
+                        StorageService.deleteImage(deleteTargetId).catch(console.error);
+                        if (currentImage && currentImage.id === deleteTargetId) {
+                            setCurrentImage(null);
+                            setHasSaved(false);
+                        }
+                    }
+                    setDeleteConfirmOpen(false);
+                    setDeleteTargetId(null);
+                }}
+                onCancel={() => {
+                    setDeleteConfirmOpen(false);
+                    setDeleteTargetId(null);
+                }}
+            />
+
             {/* Header */}
             <header className="fixed top-0 w-full z-50 glass-panel border-b-0 border-white/10 px-6 py-4">
                 <div className="max-w-7xl mx-auto flex justify-between items-center">
@@ -983,6 +1011,10 @@ function App() {
                     onAnalyze={(id) => {
                         const item = history.find(h => h.id === id);
                         if (item) handleGeminiAnalysis(item);
+                    }}
+                    onDelete={(id) => {
+                        setDeleteTargetId(id);
+                        setDeleteConfirmOpen(true);
                     }}
                     t={t}
                     analyzingIds={analyzingIds}

@@ -9,11 +9,12 @@ interface HistoryListProps {
   history: ProcessedImage[];
   onSelect: (item: ProcessedImage) => void;
   onAnalyze: (id: string) => void;
+  onDelete: (id: string) => void;
   t: (key: string) => string;
   analyzingIds: Set<string>;
 }
 
-export const HistoryList: React.FC<HistoryListProps> = ({ history, onSelect, onAnalyze, t, analyzingIds }) => {
+export const HistoryList: React.FC<HistoryListProps> = ({ history, onSelect, onAnalyze, onDelete, t, analyzingIds }) => {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
   if (history.length === 0) return null;
@@ -94,10 +95,11 @@ export const HistoryList: React.FC<HistoryListProps> = ({ history, onSelect, onA
                       className="text-left px-3 py-2 text-xs hover:bg-gray-100 dark:hover:bg-gray-700 w-full text-red-500"
                       onClick={(e) => {
                         e.stopPropagation();
+                        onDelete(item.id);
                         setOpenMenuId(null);
                       }}
                     >
-                      {t('close_menu')}
+                      {t('delete_record')}
                     </button>
                   </div>
                 )}

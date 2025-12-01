@@ -132,7 +132,8 @@ const compressPNGWithUPNG = async (canvas: HTMLCanvasElement, quality: number): 
  */
 export const applyImageEnhancement = async (
     file: File,
-    intensity: number // 0.0 to 1.0 (Strength of sharpening)
+    intensity: number, // 0.0 to 1.0 (Strength of sharpening)
+    outputFormat: 'original' | 'webp' | 'png' | 'jpeg' = 'original'
 ): Promise<Blob> => {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -140,7 +141,7 @@ export const applyImageEnhancement = async (
         reader.onload = (event) => {
             const img = new Image();
             img.src = event.target?.result as string;
-            img.onload = () => {
+            img.onload = async () => {
                 const canvas = document.createElement('canvas');
                 const ctx = canvas.getContext('2d');
                 if (!ctx) { reject(new Error("Canvas context unavailable")); return; }
@@ -177,10 +178,35 @@ export const applyImageEnhancement = async (
                     ctx.putImageData(imageData, 0, 0);
                 }
 
-                canvas.toBlob((blob) => {
-                    if (blob) resolve(blob);
-                    else reject(new Error("Enhancement failed"));
-                }, file.type === 'image/png' ? 'image/png' : 'image/jpeg', 1.0);
+                // Determine output format
+                const isPNG = file.type === 'image/png';
+                const desiredFormat = outputFormat === 'original'
+                    ? (isPNG ? 'png' : file.type === 'image/jpeg' ? 'jpeg' : 'webp')
+                    : outputFormat;
+
+                try {
+                    if (desiredFormat === 'png') {
+                        // Use UPNG for consistency if available, or fallback to canvas
+                        // Since we are in applyImageEnhancement, let's use canvas.toBlob for simplicity unless we want to reuse compressPNGWithUPNG
+                        // But compressPNGWithUPNG is not exported.
+                        // Let's just use standard canvas.toBlob for now as enhancement usually implies high quality.
+                        // Actually, let's try to match logic.
+                        // If we want to be consistent, we should probably use the same logic as compressImage.
+                        // But for now, let's stick to canvas.toBlob with high quality.
+                        canvas.toBlob((blob) => {
+                            if (blob) resolve(blob);
+                            else reject(new Error("Enhancement failed"));
+                        }, 'image/png');
+                    } else {
+                        const mimeType = desiredFormat === 'jpeg' ? 'image/jpeg' : 'image/webp';
+                        canvas.toBlob((blob) => {
+                            if (blob) resolve(blob);
+                            else reject(new Error("Enhancement failed"));
+                        }, mimeType, 0.92); // High quality for enhancement
+                    }
+                } catch (e) {
+                    reject(e);
+                }
             };
             img.onerror = (err) => reject(err);
         };
@@ -274,4 +300,50 @@ export const generateZip = async (
     }
 
     return zip.generateAsync({ type: "blob" });
+};
+
+/**
+ * Converts a Blob to a specific format using Canvas API.
+ * Useful for changing format without re-processing (e.g. AI output).
+ */
+export const convertBlobFormat = async (
+    blob: Blob,
+    outputFormat: 'original' | 'webp' | 'png' | 'jpeg'
+): Promise<Blob> => {
+    // If original format is requested, return as is
+    if (outputFormat === 'original') return blob;
+
+    // If the blob is already in the desired format, return as is
+    const targetMime = outputFormat === 'png' ? 'image/png' : outputFormat === 'jpeg' ? 'image/jpeg' : 'image/webp';
+    if (blob.type === targetMime) return blob;
+
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width;
+            canvas.height = img.height;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) {
+                reject(new Error("Canvas context unavailable"));
+                return;
+            }
+            ctx.drawImage(img, 0, 0);
+
+            // Use high quality for conversion
+            const quality = 0.92;
+
+            canvas.toBlob((newBlob) => {
+                if (newBlob) resolve(newBlob);
+                else reject(new Error("Format conversion failed"));
+            }, targetMime, quality);
+
+            URL.revokeObjectURL(img.src);
+        };
+        img.onerror = (e) => {
+            URL.revokeObjectURL(img.src);
+            reject(e);
+        };
+        img.src = URL.createObjectURL(blob);
+    });
 };

@@ -110,7 +110,7 @@ function App() {
         customBaseUrl: '',
         defaultQuality: 0.8,
         smartCompression: true,
-        compressionMode: 'canvas', // 默认使用极速模式
+        compressionMode: 'algorithm', // 默认使用专业模式
         outputFormat: 'original', // 默认保持原格式
         defaultProcessMode: 'compress',
         enhanceMethod: 'algorithm',
@@ -170,7 +170,7 @@ function App() {
             return await compressImage(file, val, settings.compressionMode, settings.outputFormat);
         } else {
             // Algorithm Enhance
-            return await applyImageEnhancement(file, val);
+            return await applyImageEnhancement(file, val, settings.outputFormat);
         }
     };
 
@@ -276,6 +276,39 @@ function App() {
         }, 300);
     };
 
+    // Re-process when output format changes (for supported modes)
+    useEffect(() => {
+        if (!currentImage) return;
+
+        const isAlgorithmMode = processMode === 'compress' && settings.compressionMode === 'algorithm';
+        const isEnhanceMode = processMode === 'enhance' && settings.enhanceMethod === 'algorithm';
+
+        if (isAlgorithmMode || isEnhanceMode) {
+            handleSliderChange(sliderValue);
+        } else if (processMode === 'enhance' && settings.enhanceMethod === 'ai' && currentImage?.aiOriginalBlob) {
+            // Handle AI Format Conversion
+            (async () => {
+                setIsProcessing(true);
+                try {
+                    const newBlob = await convertBlobFormat(currentImage.aiOriginalBlob!, settings.outputFormat);
+                    const compressedPreview = await blobToDataURL(newBlob);
+
+                    setCurrentImage(prev => prev ? ({
+                        ...prev,
+                        compressedBlob: newBlob,
+                        compressedPreview,
+                        compressedSize: newBlob.size,
+                        outputFormat: settings.outputFormat
+                    }) : null);
+                } catch (e) {
+                    console.error("Format conversion failed", e);
+                } finally {
+                    setIsProcessing(false);
+                }
+            })();
+        }
+    }, [settings.outputFormat]);
+
     // AI Generation Handler
     const handleAIEnhance = async () => {
         if (!currentImage) return;
@@ -306,8 +339,10 @@ function App() {
                         updates.qualityUsed = 1; // Flag as generated
                         updates.aiModelUsed = settings.aiModel; // Save model used
                         updates.compressedBlob = blob;
+                        updates.aiOriginalBlob = blob; // Save original for re-formatting
                         updates.compressedSize = blob.size;
                         updates.compressionRatio = 0;
+                        updates.outputFormat = 'original'; // Default to original
                     }
 
                     return {
@@ -354,7 +389,9 @@ function App() {
                 compressedSize: prev.originalSize, // Reset size
                 compressedBlob: prev.originalFile.slice(0, prev.originalFile.size, prev.originalFile.type), // Reset blob
                 compressionRatio: 0,
-                aiGeneratedText: undefined // Clear previous text
+                aiGeneratedText: undefined, // Clear previous text
+                aiOriginalBlob: undefined, // Clear previous AI blob
+                outputFormat: 'original'
             }) : null);
             setHasSaved(false);
             return;
@@ -417,13 +454,20 @@ function App() {
         if (currentImage) {
             const link = document.createElement('a');
             link.href = currentImage.compressedPreview;
-            let originalName = currentImage.originalFile.name;
-            if (currentImage.compressedBlob.type === 'image/webp') {
-                const nameParts = originalName.split('.');
-                if (nameParts.length > 1) nameParts.pop();
-                originalName = nameParts.join('.') + '.webp';
-            }
-            const fileName = getCompressedFileName(originalName, currentImage.qualityUsed, currentImage.mode, currentImage.aiModelUsed);
+
+            // Determine format from blob type
+            let format = 'original';
+            if (currentImage.compressedBlob.type === 'image/webp') format = 'webp';
+            else if (currentImage.compressedBlob.type === 'image/png') format = 'png';
+            else if (currentImage.compressedBlob.type === 'image/jpeg') format = 'jpeg';
+
+            const fileName = getCompressedFileName(
+                currentImage.originalFile.name,
+                currentImage.qualityUsed,
+                currentImage.mode,
+                currentImage.aiModelUsed,
+                format
+            );
             link.download = fileName;
             link.click();
         }
@@ -808,7 +852,7 @@ function App() {
                                             <select
                                                 value={settings.outputFormat}
                                                 onChange={(e) => setSettings(prev => ({ ...prev, outputFormat: e.target.value as any }))}
-                                                disabled={isCanvasMode || isAIEnhance}
+                                                disabled={isCanvasMode}
                                                 className="w-full p-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-dark text-gray-900 dark:text-gray-100 text-sm font-medium focus:ring-2 focus:ring-primary outline-none disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                                             >
                                                 <option value="original">{t('format_original')}</option>
@@ -823,7 +867,7 @@ function App() {
                                             )}
                                             {isAIEnhance && (
                                                 <p className="text-xs text-blue-600 dark:text-blue-400 flex items-center gap-1 bg-blue-50 dark:bg-blue-900/20 p-2 rounded">
-                                                    <span className="font-bold">ℹ️</span> {t('format_note_ai')}
+                                                    <span className="font-bold">ℹ️</span> {t('format_note_ai_enabled') || "AI output can be converted."}
                                                 </p>
                                             )}
                                         </div>

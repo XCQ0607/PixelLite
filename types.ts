@@ -22,6 +22,7 @@ export interface ProcessedImage {
   aiData?: AIData;
   aiModelUsed?: string; // Track which AI model was used for generation
   aiGeneratedText?: string; // Text returned from AI generation
+  aiOriginalBlob?: Blob; // Store original AI output for re-formatting
   outputFormat?: 'original' | 'webp' | 'png' | 'jpeg'; // Track actual output format
 }
 

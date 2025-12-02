@@ -899,7 +899,7 @@ function App() {
                                             )}
                                             {isAIEnhance && (
                                                 <p className="text-xs text-blue-600 dark:text-blue-400 flex items-center gap-1 bg-blue-50 dark:bg-blue-900/20 p-2 rounded">
-                                                    <span className="font-bold">ℹ️</span> {t('format_note_ai_enabled') || "AI output can be converted."}
+                                                    <span className="font-bold">ℹ️</span> {t('format_note_ai')}
                                                 </p>
                                             )}
                                         </div>

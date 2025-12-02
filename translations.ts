@@ -325,7 +325,7 @@ export const translations: Record<Language, TranslationKeys> = {
         format_png: 'PNG',
         format_jpeg: 'JPEG',
         format_note_canvas: '注意：极速模式仅支持 WebP 输出',
-        format_note_ai: '注意：AI 模式不支持自定义格式',
+        format_note_ai: 'AI图片输出格式为Base64转码',
         format_will_be: '输出将为',
 
         restore_modal_title: '备份管理',
@@ -496,7 +496,7 @@ export const translations: Record<Language, TranslationKeys> = {
         format_png: 'PNG',
         format_jpeg: 'JPEG',
         format_note_canvas: 'Note: Fast Mode only supports WebP output',
-        format_note_ai: 'Note: AI Mode does not support custom format',
+        format_note_ai: 'AI images is transfered from Base64',
         format_will_be: 'Output will be',
 
         restore_modal_title: 'Backup Manager',

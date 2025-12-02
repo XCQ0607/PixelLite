@@ -496,7 +496,7 @@ export const translations: Record<Language, TranslationKeys> = {
         format_png: 'PNG',
         format_jpeg: 'JPEG',
         format_note_canvas: 'Note: Fast Mode only supports WebP output',
-        format_note_ai: 'AI images is transfered from Base64',
+        format_note_ai: 'AI images are transferred from Base64',
         format_will_be: 'Output will be',
 
         restore_modal_title: 'Backup Manager',
